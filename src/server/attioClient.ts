@@ -66,10 +66,56 @@ function getString(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+function getArray(v: unknown): unknown[] | null {
+  return Array.isArray(v) ? v : null;
+}
+
 function getNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
   return null;
+}
+
+function getValuesRecord(record: Record<string, unknown>): Record<string, unknown> | null {
+  // Attio often returns records like: { data: { values: { ... } } }
+  const values =
+    asRecord(record["values"]) ??
+    asRecord(asRecord(record["data"])?.["values"]) ??
+    asRecord(asRecord(record["data"])?.["record"] as unknown)?.["values"];
+  return values ? (values as Record<string, unknown>) : null;
+}
+
+function pickFirstValue(values: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  const arr = getArray(values[key]);
+  if (!arr || arr.length === 0) return null;
+  return asRecord(arr[0]) ?? null;
+}
+
+function pickTextValue(values: Record<string, unknown>, key: string): string | null {
+  const first = pickFirstValue(values, key);
+  return getString(first?.["value"]) ?? null;
+}
+
+function pickStatusTitle(values: Record<string, unknown>, key: string): string | null {
+  const first = pickFirstValue(values, key);
+  const status = asRecord(first?.["status"]);
+  return getString(status?.["title"]) ?? null;
+}
+
+function pickOptionTitle(values: Record<string, unknown>, key: string): string | null {
+  const first = pickFirstValue(values, key);
+  const option = asRecord(first?.["option"]);
+  return getString(option?.["title"]) ?? null;
+}
+
+function pickCurrencyValue(values: Record<string, unknown>, key: string): number | null {
+  const first = pickFirstValue(values, key);
+  return getNumber(first?.["currency_value"]) ?? getNumber(first?.["currencyValue"]) ?? null;
+}
+
+function pickDateValue(values: Record<string, unknown>, key: string): string | null {
+  const first = pickFirstValue(values, key);
+  return getString(first?.["value"]) ?? null;
 }
 
 function getMembersArray(data: unknown): unknown[] {
@@ -141,6 +187,17 @@ export async function listWorkspaceMembersRaw(): Promise<unknown[]> {
 
 function tryParseOwnerWorkspaceMemberId(record: Record<string, unknown>): string | null {
   // Common pattern mentioned: actor reference { referenced_actor_type: "workspace-member", referenced_actor_id: "<uuid>" }
+  // Newer Attio record shape stores owner under values.owner[].
+  const values = getValuesRecord(record);
+  if (values) {
+    const first = pickFirstValue(values, "owner");
+    if (first) {
+      const rat = getString(first["referenced_actor_type"]) ?? getString(first["referencedActorType"]);
+      const rai = getString(first["referenced_actor_id"]) ?? getString(first["referencedActorId"]);
+      if (rat && rat.toLowerCase() === "workspace-member" && rai) return rai;
+    }
+  }
+
   const owner =
     asRecord(record["owner"]) ??
     asRecord(record["deal_owner"]) ??
@@ -164,35 +221,64 @@ export function parseDealRecord(raw: unknown): AttioDealParsed | null {
   const rec = asRecord(raw);
   if (!rec) return null;
 
+  const values = getValuesRecord(rec);
+
+  const idObj = asRecord(rec["id"]);
   const attioRecordId =
-    getString(rec["id"]) ?? getString(rec["record_id"]) ?? getString(rec["recordId"]) ?? null;
+    getString(rec["id"]) ??
+    getString(idObj?.["record_id"]) ??
+    getString(idObj?.["recordId"]) ??
+    getString(rec["record_id"]) ??
+    getString(rec["recordId"]) ??
+    (values ? pickTextValue(values, "record_id") : null) ??
+    null;
   if (!attioRecordId) return null;
 
   const attributes = asRecord(rec["attributes"]) ?? rec;
 
   const dealName =
+    (values ? pickTextValue(values, "name") : null) ??
     getString(rec["deal_name"]) ??
     getString(rec["name"]) ??
     getString(attributes?.["deal_name"]) ??
     getString(attributes?.["name"]) ??
     "Untitled deal";
 
+  // Attio record references (e.g. associated_company) only include target_record_id in the record payload.
+  // We'll keep accountName optional until we also sync companies and resolve names.
   const accountName =
     getString(rec["account_name"]) ??
     getString(attributes?.["account_name"]) ??
     getString(attributes?.["company_name"]) ??
     null;
 
-  const amount = getNumber(rec["amount"]) ?? getNumber(attributes?.["amount"]) ?? 0;
+  const amount =
+    (values ? pickCurrencyValue(values, "value") : null) ??
+    (values ? getNumber(pickFirstValue(values, "deal_value_local")?.["value"]) : null) ??
+    getNumber(rec["amount"]) ??
+    getNumber(attributes?.["amount"]) ??
+    0;
   const commissionableAmount =
-    getNumber(rec["commissionable_amount"]) ?? getNumber(attributes?.["commissionable_amount"]) ?? amount;
+    getNumber(rec["commissionable_amount"]) ??
+    getNumber(attributes?.["commissionable_amount"]) ??
+    amount;
 
-  const closeDate =
+  const closeDateRaw =
+    (values ? pickDateValue(values, "won_loss_date") : null) ??
+    (values ? pickDateValue(values, "estimated_close_date") : null) ??
     getString(rec["close_date"]) ??
     getString(attributes?.["close_date"]) ??
     getString(attributes?.["closed_at"]) ??
     null;
+
+  const closeDate =
+    closeDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(closeDateRaw)
+      ? new Date(`${closeDateRaw}T00:00:00.000Z`).toISOString()
+      : closeDateRaw;
+
   const status =
+    (values ? pickStatusTitle(values, "stage") : null) ??
+    (values ? pickOptionTitle(values, "deal_forecast") : null) ??
     getString(rec["status"]) ??
     getString(attributes?.["status"]) ??
     getString(attributes?.["stage"]) ??
