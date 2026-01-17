@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/server/auth";
+import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
 import { prisma } from "@/server/db";
 
 export async function POST(req: Request) {
@@ -33,16 +34,18 @@ export async function POST(req: Request) {
     select: { id: true, attioWorkspaceMemberId: true },
   });
 
+  const reconcile = await reconcileDealsToAEs({ onlyMemberId: workspaceMemberId });
+
   await prisma.auditLog.create({
     data: {
       actorUserId: userId,
       action: "AE_ATTIO_LINKED",
       entityType: "AEProfile",
       entityId: ae.id,
-      detailsJson: { attioWorkspaceMemberId: workspaceMemberId } as any,
+      detailsJson: { attioWorkspaceMemberId: workspaceMemberId, dealsAssigned: reconcile.dealsUpdated } as any,
     },
   });
 
-  return NextResponse.json({ ok: true, aeProfile: ae });
+  return NextResponse.json({ ok: true, aeProfile: ae, dealsAssigned: reconcile.dealsUpdated });
 }
 

@@ -1,4 +1,5 @@
 import { listDealsRaw, listWorkspaceMembersRaw, parseDealRecord } from "@/server/attioClient";
+import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
 import { prisma } from "@/server/db";
 
 export type AttioSyncResult = {
@@ -7,6 +8,7 @@ export type AttioSyncResult = {
   dealsParsed: number;
   membersUpserted: number;
   dealsUpserted: number;
+  dealsAssigned: number;
 };
 
 export async function runAttioSync(params: { actorUserId: string | null }): Promise<AttioSyncResult> {
@@ -69,7 +71,12 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
     dealsParsed: parsedDeals.length,
     membersUpserted: memberUpserts.filter(Boolean).length,
     dealsUpserted: dealUpserts.length,
+    dealsAssigned: 0,
   };
+
+  // Map synced deals to AEProfiles (based on AEProfile.attioWorkspaceMemberId).
+  const reconcile = await reconcileDealsToAEs();
+  result.dealsAssigned = reconcile.dealsUpdated;
 
   await prisma.auditLog.create({
     data: {
