@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { computeAeleaderboard, type AE, type DealWithAE } from "@/lib/leaderboard";
-import { formatQuarter, type Quarter } from "@/lib/quarters";
+import { formatQuarter, getPreviousQuarter, getQuarterDateRangeUTC, type Quarter } from "@/lib/quarters";
 
 function formatCurrency(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -14,10 +14,34 @@ function getDefaultYearQuarter(): { year: number; quarter: Quarter } {
   return { year, quarter };
 }
 
-export default function Home() {
+type HomeView = "ytd" | "qtd" | "prevq";
+
+function getViewLabel(view: HomeView) {
+  if (view === "ytd") return "Annual-to-date";
+  if (view === "qtd") return "QTD";
+  return "Previous Q";
+}
+
+function isHomeView(v: unknown): v is HomeView {
+  return v === "ytd" || v === "qtd" || v === "prevq";
+}
+
+function filterDealsByCloseDateRange(deals: DealWithAE[], start: Date, end: Date) {
+  return deals.filter((d) => {
+    const dt = new Date(d.closeDate);
+    return dt >= start && dt <= end;
+  });
+}
+
+export default async function Home(props: {
+  searchParams?: Promise<{ year?: string; quarter?: string; view?: string }>;
+}) {
+  const sp = (await props.searchParams) ?? {};
   const fallback = getDefaultYearQuarter();
-  const year = fallback.year;
-  const quarter = fallback.quarter;
+  const year = Number(sp.year ?? fallback.year);
+  const quarter = Number(sp.quarter ?? fallback.quarter) as Quarter;
+  const view: HomeView = isHomeView(sp.view) ? sp.view : "qtd";
+  const now = new Date();
 
   // Mock data for UI iteration (login/DB/Attio next)
   const aes: AE[] = [
@@ -80,11 +104,23 @@ export default function Home() {
     },
   ];
 
+  const { start: qtdStart, end: qtdEnd } = getQuarterDateRangeUTC(year, quarter);
+  const prev = getPreviousQuarter(year, quarter);
+  const { start: prevStart, end: prevEnd } = getQuarterDateRangeUTC(prev.year, prev.quarter);
+  const ytdStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
+
+  const range =
+    view === "ytd"
+      ? { start: ytdStart, end: now }
+      : view === "prevq"
+        ? { start: prevStart, end: prevEnd }
+        : { start: qtdStart, end: qtdEnd };
+
+  const dealsInRange = filterDealsByCloseDateRange(deals, range.start, range.end);
+
   const { totals, rows } = computeAeleaderboard({
-    year,
-    quarter,
     aes,
-    deals,
+    deals: dealsInRange,
     closedWonValue: "Closed Won",
   });
 
@@ -136,8 +172,31 @@ export default function Home() {
 
           <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
             <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-              <div className="text-sm font-medium">AE Leaderboard</div>
-              <div className="text-xs text-zinc-500">Sorted by Closed Won amount</div>
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium">AE Leaderboard</div>
+                <div className="text-xs text-zinc-500">{getViewLabel(view)} • sorted by Closed Won amount</div>
+              </div>
+
+              <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+                <Link
+                  href={{ pathname: "/", query: { year, quarter, view: "ytd" } }}
+                  className={`rounded-md px-3 py-1.5 ${view === "ytd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+                >
+                  YTD
+                </Link>
+                <Link
+                  href={{ pathname: "/", query: { year, quarter, view: "qtd" } }}
+                  className={`rounded-md px-3 py-1.5 ${view === "qtd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+                >
+                  QTD
+                </Link>
+                <Link
+                  href={{ pathname: "/", query: { year, quarter, view: "prevq" } }}
+                  className={`rounded-md px-3 py-1.5 ${view === "prevq" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+                >
+                  Prev Q
+                </Link>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">

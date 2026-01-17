@@ -20,8 +20,6 @@ export type AERow = {
 };
 
 export function computeAeleaderboard(params: {
-  year: number;
-  quarter: Quarter;
   aes: AE[];
   deals: DealWithAE[];
   closedWonValue?: string;

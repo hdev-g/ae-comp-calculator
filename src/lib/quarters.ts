@@ -14,6 +14,11 @@ export function getQuarterDateRangeUTC(year: number, quarter: Quarter): { start:
   return { start, end };
 }
 
+export function getPreviousQuarter(year: number, quarter: Quarter): { year: number; quarter: Quarter } {
+  if (quarter === 1) return { year: year - 1, quarter: 4 };
+  return { year, quarter: (quarter - 1) as Quarter };
+}
+
 export function formatQuarter(year: number, quarter: Quarter) {
   return `Q${quarter} ${year}`;
 }
