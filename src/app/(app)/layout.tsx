@@ -4,7 +4,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <div className="flex min-h-screen w-full">
-        <aside className="hidden w-64 flex-none border-r border-zinc-200 bg-white sm:block">
+        <aside className="hidden w-[274px] flex-none border-r border-zinc-200 bg-white sm:block">
           <SidebarNav />
         </aside>
 
