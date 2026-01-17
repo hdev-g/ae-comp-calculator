@@ -60,7 +60,7 @@ export function SidebarNav() {
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-zinc-950 hover:bg-zinc-50"
+            className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] leading-5 font-semibold text-zinc-950 hover:bg-zinc-50"
           >
             <div className="grid size-7 place-items-center rounded-md bg-white ring-1 ring-zinc-200">
               <img
@@ -91,7 +91,7 @@ export function SidebarNav() {
               key={item.href}
               href={item.href}
               className={cx(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-md px-3 py-2 text-[14px] leading-5 font-medium transition-colors",
                 active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100",
               )}
             >
