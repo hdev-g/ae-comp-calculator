@@ -46,6 +46,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "My dashboard" },
+  { href: "/deals", label: "Deals" },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
