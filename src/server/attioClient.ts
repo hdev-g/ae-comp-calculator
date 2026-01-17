@@ -4,12 +4,33 @@ type AttioWorkspaceMember = {
   name?: string | null;
 };
 
+export type AttioDealParsed = {
+  attioRecordId: string;
+  dealName: string;
+  accountName?: string | null;
+  amount: number;
+  commissionableAmount: number;
+  closeDate: string; // ISO
+  status: string;
+  ownerWorkspaceMemberId?: string | null;
+  raw: unknown;
+};
+
 function getBaseUrl() {
   return process.env.ATTIO_API_BASE_URL ?? "https://api.attio.com/v2";
 }
 
 function getApiKey() {
   return process.env.ATTIO_API_KEY;
+}
+
+function getWorkspaceMembersPath() {
+  return process.env.ATTIO_WORKSPACE_MEMBERS_PATH ?? "/workspace_members";
+}
+
+function getDealsPath() {
+  // Default assumption; configurable because Attio API shapes vary by workspace/setup.
+  return process.env.ATTIO_DEALS_PATH ?? "/objects/deals/records";
 }
 
 async function attioFetch(path: string, init?: RequestInit) {
@@ -44,10 +65,23 @@ function getString(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+function getNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return null;
+}
+
 function getMembersArray(data: unknown): unknown[] {
   const rec = asRecord(data);
   if (!rec) return [];
   const candidate = rec["data"] ?? rec["workspace_members"] ?? rec["members"];
+  return Array.isArray(candidate) ? candidate : [];
+}
+
+function getDealsArray(data: unknown): unknown[] {
+  const rec = asRecord(data);
+  if (!rec) return [];
+  const candidate = rec["data"] ?? rec["records"] ?? rec["deals"];
   return Array.isArray(candidate) ? candidate : [];
 }
 
@@ -59,9 +93,7 @@ export async function findWorkspaceMemberByEmail(email: string): Promise<AttioWo
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
 
-  // Endpoint naming based on Attio's v2 REST patterns. If your workspace uses a different route,
-  // we can adjust once you confirm the exact endpoint/response shape from Attio docs.
-  const data = await attioFetch("/workspace_members");
+  const data = await attioFetch(getWorkspaceMembersPath());
 
   const items = getMembersArray(data);
 
@@ -93,5 +125,89 @@ export async function findWorkspaceMemberByEmail(email: string): Promise<AttioWo
   }
 
   return null;
+}
+
+export async function listWorkspaceMembersRaw(): Promise<unknown[]> {
+  const data = await attioFetch(getWorkspaceMembersPath());
+  return getMembersArray(data);
+}
+
+function tryParseOwnerWorkspaceMemberId(record: Record<string, unknown>): string | null {
+  // Common pattern mentioned: actor reference { referenced_actor_type: "workspace-member", referenced_actor_id: "<uuid>" }
+  const owner =
+    asRecord(record["owner"]) ??
+    asRecord(record["deal_owner"]) ??
+    asRecord(asRecord(record["attributes"])?.["owner"]);
+  if (!owner) return null;
+
+  const rat = getString(owner["referenced_actor_type"]) ?? getString(owner["referencedActorType"]);
+  const rai = getString(owner["referenced_actor_id"]) ?? getString(owner["referencedActorId"]);
+  if (rat && rat.toLowerCase() === "workspace-member" && rai) return rai;
+
+  // Fallbacks: sometimes owner is a direct id or nested object with id.
+  return getString(owner["id"]) ?? getString(asRecord(owner["data"])?.["id"]) ?? null;
+}
+
+/**
+ * Minimal “best effort” deal parsing.
+ * Because Attio fields vary, this uses a few common fallbacks and stores raw payload for debugging.
+ * You can refine mappings later via env vars once we confirm your exact Attio schema.
+ */
+export function parseDealRecord(raw: unknown): AttioDealParsed | null {
+  const rec = asRecord(raw);
+  if (!rec) return null;
+
+  const attioRecordId =
+    getString(rec["id"]) ?? getString(rec["record_id"]) ?? getString(rec["recordId"]) ?? null;
+  if (!attioRecordId) return null;
+
+  const attributes = asRecord(rec["attributes"]) ?? rec;
+
+  const dealName =
+    getString(rec["deal_name"]) ??
+    getString(rec["name"]) ??
+    getString(attributes?.["deal_name"]) ??
+    getString(attributes?.["name"]) ??
+    "Untitled deal";
+
+  const accountName =
+    getString(rec["account_name"]) ??
+    getString(attributes?.["account_name"]) ??
+    getString(attributes?.["company_name"]) ??
+    null;
+
+  const amount = getNumber(rec["amount"]) ?? getNumber(attributes?.["amount"]) ?? 0;
+  const commissionableAmount =
+    getNumber(rec["commissionable_amount"]) ?? getNumber(attributes?.["commissionable_amount"]) ?? amount;
+
+  const closeDate =
+    getString(rec["close_date"]) ??
+    getString(attributes?.["close_date"]) ??
+    getString(attributes?.["closed_at"]) ??
+    null;
+  const status =
+    getString(rec["status"]) ??
+    getString(attributes?.["status"]) ??
+    getString(attributes?.["stage"]) ??
+    "";
+
+  const ownerWorkspaceMemberId = tryParseOwnerWorkspaceMemberId(rec);
+
+  return {
+    attioRecordId,
+    dealName,
+    accountName,
+    amount,
+    commissionableAmount,
+    closeDate: closeDate ?? new Date(0).toISOString(),
+    status,
+    ownerWorkspaceMemberId,
+    raw,
+  };
+}
+
+export async function listDealsRaw(): Promise<unknown[]> {
+  const data = await attioFetch(getDealsPath());
+  return getDealsArray(data);
 }
 
