@@ -53,9 +53,16 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
       const rec = raw as Record<string, any>;
       const id = extractWorkspaceMemberId(raw);
       if (!id) return null;
-      const email = pickString(rec?.email, rec?.attributes?.email, rec?.user?.email)?.toLowerCase() ?? null;
-      const fullName = pickString(rec?.name, rec?.full_name, rec?.fullName) ?? null;
-      const status = pickString(rec?.status) ?? null;
+      const email =
+        pickString(rec?.email, rec?.email_address, rec?.attributes?.email, rec?.user?.email)?.toLowerCase() ?? null;
+      const fullName =
+        pickString(
+          rec?.name,
+          rec?.full_name,
+          rec?.fullName,
+          [pickString(rec?.first_name), pickString(rec?.last_name)].filter(Boolean).join(" ").trim(),
+        ) ?? null;
+      const status = pickString(rec?.access_level, rec?.status) ?? null;
 
       // Repair/migrate: if we previously stored a bad primary key (e.g. "[object Object]") for the same email,
       // we need to replace that row so future link-by-email yields a valid id.
