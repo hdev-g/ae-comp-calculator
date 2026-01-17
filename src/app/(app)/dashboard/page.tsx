@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 
 import { computeQuarterStatement, type BonusRule, type CommissionPlan, type Deal } from "@/lib/commission";
 import {
@@ -7,6 +8,8 @@ import {
   getQuarterDateRangeUTC,
   getQuarterForDate,
 } from "@/lib/quarters";
+import { authOptions } from "@/server/auth";
+import { prisma } from "@/server/db";
 
 function formatCurrency(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -35,66 +38,28 @@ function filterDealsByCloseDateRange(deals: Deal[], start: Date, end: Date) {
   });
 }
 
+function decimalToNumber(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  const anyV = v as any;
+  if (anyV && typeof anyV === "object" && typeof anyV.toNumber === "function") {
+    const n = anyV.toNumber();
+    return typeof n === "number" && Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
 export default async function DashboardPage(props: {
   searchParams?: Promise<{ view?: string }>;
 }) {
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id ?? null;
+  if (!userId) return null;
+
   const sp = (await props.searchParams) ?? {};
   const view: DashboardView = isDashboardView(sp.view) ? sp.view : "qtd";
   const now = new Date();
   const { year, quarter } = getQuarterForDate(now);
-
-  // Mock data for UI iteration (auth/Attio/DB wired later)
-  const plans: CommissionPlan[] = [
-    {
-      id: "plan-2026",
-      name: "2026 AE Plan",
-      effectiveStartDate: "2026-01-01T00:00:00.000Z",
-      baseCommissionRate: 0.1,
-    },
-  ];
-
-  const bonusRules: BonusRule[] = [
-    { id: "b1", commissionPlanId: "plan-2026", type: "multi_year", rateAdd: 0.01, enabled: true },
-    { id: "b2", commissionPlanId: "plan-2026", type: "testimonial", rateAdd: 0.01, enabled: true },
-    { id: "b3", commissionPlanId: "plan-2026", type: "marketing", rateAdd: 0.01, enabled: true },
-  ];
-
-  const deals: Deal[] = [
-    {
-      id: "d1",
-      dealName: "Wordsmith × Acme",
-      accountName: "Acme",
-      amount: 50000,
-      commissionableAmount: 50000,
-      closeDate: "2026-01-15T00:00:00.000Z",
-      status: "Closed Won",
-      termLengthMonths: 12,
-      hasTestimonialCommitment: true,
-      hasMarketingCommitment: false,
-    },
-    {
-      id: "d2",
-      dealName: "Contoso Expansion",
-      accountName: "Contoso",
-      amount: 120000,
-      commissionableAmount: 120000,
-      closeDate: "2026-02-20T00:00:00.000Z",
-      status: "Closed Won",
-      termLengthMonths: 24,
-      hasTestimonialCommitment: false,
-      hasMarketingCommitment: true,
-    },
-    {
-      id: "d3",
-      dealName: "Initech Pilot",
-      accountName: "Initech",
-      amount: 20000,
-      commissionableAmount: 20000,
-      closeDate: "2026-03-03T00:00:00.000Z",
-      status: "Open",
-      termLengthMonths: 12,
-    },
-  ];
 
   const { start: qtdStart, end: qtdEnd } = getQuarterDateRangeUTC(year, quarter);
   const prev = getPreviousQuarter(year, quarter);
@@ -108,19 +73,78 @@ export default async function DashboardPage(props: {
         ? { start: prevStart, end: prevEnd }
         : { start: qtdStart, end: qtdEnd };
 
-  const dealsInRange = filterDealsByCloseDateRange(deals, range.start, range.end);
-
-  const statement = computeQuarterStatement({
-    year,
-    quarter,
-    deals: dealsInRange,
-    plans,
-    bonusRules,
-    closedWonValue: "Closed Won",
+  const ae = await prisma.aEProfile.findUnique({
+    where: { userId },
+    select: { id: true },
   });
 
+  const dealsFromDb = ae?.id
+    ? await prisma.deal.findMany({
+        where: {
+          aeProfileId: ae.id,
+          status: { contains: "won", mode: "insensitive" },
+          closeDate: { gte: range.start, lte: range.end },
+        },
+        orderBy: [{ closeDate: "desc" }],
+        take: 500,
+      })
+    : [];
+
+  const dealsInRange: Deal[] = dealsFromDb.map((d) => ({
+    id: d.id,
+    dealName: d.dealName,
+    accountName: d.accountName ?? undefined,
+    amount: decimalToNumber(d.amount),
+    commissionableAmount: decimalToNumber(d.commissionableAmount),
+    closeDate: d.closeDate.toISOString(),
+    status: (d.status ?? "").toLowerCase().includes("won") ? "Won" : d.status,
+    termLengthMonths: d.termLengthMonths ?? null,
+    isMultiYear: d.isMultiYear,
+    hasTestimonialCommitment: d.hasTestimonialCommitment,
+    hasMarketingCommitment: d.hasMarketingCommitment,
+  }));
+
+  const plansDb = await prisma.commissionPlan.findMany({ orderBy: [{ effectiveStartDate: "desc" }] });
+  const bonusDb = await prisma.bonusRule.findMany({});
+
+  const plans: CommissionPlan[] = plansDb.map((p) => ({
+    id: p.id,
+    name: p.name,
+    effectiveStartDate: p.effectiveStartDate.toISOString(),
+    effectiveEndDate: p.effectiveEndDate ? p.effectiveEndDate.toISOString() : undefined,
+    baseCommissionRate: decimalToNumber(p.baseCommissionRate),
+  }));
+
+  const bonusRules: BonusRule[] = bonusDb.map((b) => ({
+    id: b.id,
+    commissionPlanId: b.commissionPlanId,
+    type: b.type as BonusRule["type"],
+    rateAdd: decimalToNumber(b.rateAdd),
+    enabled: b.enabled,
+  }));
+
+  const closedWonDeals = dealsInRange.filter((d) => d.status === "Won");
+  const fallbackClosedWonAmount = closedWonDeals.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+
+  const statement = (() => {
+    if (plans.length === 0) {
+      return { year, quarter, totalClosedWonAmount: fallbackClosedWonAmount, totalCommission: 0, lineItems: [] };
+    }
+    try {
+      return computeQuarterStatement({
+        year,
+        quarter,
+        deals: dealsInRange,
+        plans,
+        bonusRules,
+        closedWonValue: "Won",
+      });
+    } catch {
+      return { year, quarter, totalClosedWonAmount: fallbackClosedWonAmount, totalCommission: 0, lineItems: [] };
+    }
+  })();
+
   const lineItemsByDealId = new Map(statement.lineItems.map((li) => [li.dealId, li]));
-  const closedWonDeals = dealsInRange.filter((d) => d.status === "Closed Won");
 
   return (
     <div className="px-6 py-10">
@@ -131,7 +155,7 @@ export default async function DashboardPage(props: {
               <div className="text-sm text-zinc-600">AE Dashboard</div>
               <h1 className="text-2xl font-semibold tracking-tight">{formatQuarter(year, quarter)}</h1>
               <div className="mt-1 text-sm text-zinc-600">
-                {getViewLabel(view)} • mock data for UI iteration (Attio/SSO next).
+                {getViewLabel(view)}
               </div>
             </div>
 
@@ -145,6 +169,9 @@ export default async function DashboardPage(props: {
             <div className="rounded-xl border border-zinc-200 bg-white p-5">
               <div className="text-sm text-zinc-600">Commission Earned</div>
               <div className="mt-2 text-2xl font-semibold">{formatCurrency(statement.totalCommission)}</div>
+              {plans.length === 0 ? (
+                <div className="mt-1 text-xs text-zinc-500">Commission plan not configured yet.</div>
+              ) : null}
             </div>
             <div className="rounded-xl border border-zinc-200 bg-white p-5">
               <div className="text-sm text-zinc-600">Deals Count</div>
@@ -194,8 +221,7 @@ export default async function DashboardPage(props: {
                 <tbody>
                   {closedWonDeals.map((d) => {
                     const li = lineItemsByDealId.get(d.id);
-                    if (!li) return null;
-                    const bonuses = li.appliedBonusBreakdown.map((b) => b.type).join(", ");
+                    const bonuses = li ? li.appliedBonusBreakdown.map((b) => b.type).join(", ") : "";
                     return (
                       <tr key={d.id} className="border-t border-zinc-100">
                         <td className="px-5 py-4">
@@ -205,15 +231,25 @@ export default async function DashboardPage(props: {
                         <td className="px-5 py-4 text-zinc-700">
                           {new Date(d.closeDate).toLocaleDateString("en-US")}
                         </td>
-                        <td className="px-5 py-4 text-zinc-700">{formatCurrency(li.commissionableAmount)}</td>
                         <td className="px-5 py-4 text-zinc-700">
-                          <div className="font-medium">{formatPercent(li.appliedTotalRate)}</div>
-                          <div className="text-xs text-zinc-500">
-                            base {formatPercent(li.appliedBaseRate)}
-                            {bonuses ? ` + ${bonuses}` : ""}
-                          </div>
+                          {formatCurrency(li?.commissionableAmount ?? d.commissionableAmount)}
                         </td>
-                        <td className="px-5 py-4 font-medium text-zinc-950">{formatCurrency(li.commissionAmount)}</td>
+                        <td className="px-5 py-4 text-zinc-700">
+                          {li ? (
+                            <>
+                              <div className="font-medium">{formatPercent(li.appliedTotalRate)}</div>
+                              <div className="text-xs text-zinc-500">
+                                base {formatPercent(li.appliedBaseRate)}
+                                {bonuses ? ` + ${bonuses}` : ""}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-zinc-400">—</div>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 font-medium text-zinc-950">
+                          {li ? formatCurrency(li.commissionAmount) : "—"}
+                        </td>
                       </tr>
                     );
                   })}

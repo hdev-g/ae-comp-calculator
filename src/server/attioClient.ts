@@ -347,6 +347,9 @@ export function parseDealRecord(raw: unknown): AttioDealParsed | null {
     getString(attributes?.["stage"]) ??
     "";
 
+  // Normalize common stage labels like "Won 🎉" -> "Won" so the rest of the app can treat wins consistently.
+  const normalizedStatus = status.toLowerCase().includes("won") ? "Won" : status;
+
   const ownerWorkspaceMemberId = tryParseOwnerWorkspaceMemberId(rec);
 
   return {
@@ -356,7 +359,7 @@ export function parseDealRecord(raw: unknown): AttioDealParsed | null {
     amount,
     commissionableAmount,
     closeDate: closeDate ?? new Date(0).toISOString(),
-    status,
+    status: normalizedStatus,
     ownerWorkspaceMemberId,
     raw,
   };
