@@ -9,13 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-zinc-200 bg-white sm:hidden">
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="text-sm font-semibold">AE Comp</div>
-              <div className="text-xs text-zinc-500">Nav in desktop sidebar</div>
-            </div>
-          </div>
-
+          <header className="h-[49px] w-full border-b border-zinc-200 bg-white" />
           <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
