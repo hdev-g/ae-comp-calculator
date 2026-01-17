@@ -3,7 +3,7 @@ import { SidebarNav } from "@/components/SidebarNav";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
-      <div className="mx-auto flex min-h-screen max-w-7xl">
+      <div className="flex min-h-screen w-full">
         <aside className="hidden w-64 flex-none border-r border-zinc-200 bg-white sm:block">
           <SidebarNav />
         </aside>
