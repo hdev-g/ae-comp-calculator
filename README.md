@@ -4,6 +4,12 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 For a quick “see it running” local preview (no DB/auth yet), see `docs/local-dev.md`.
 
+## Google SSO + Attio auto-link (new)
+
+This app uses **Google SSO** (NextAuth) and can optionally auto-link the signed-in user to an **Attio workspace member** by matching email (using a single workspace API key).
+
+See `docs/auth-attio.md`.
+
 1) Start Postgres (local)
 
 This repo includes `docker-compose.yml` for local Postgres:
