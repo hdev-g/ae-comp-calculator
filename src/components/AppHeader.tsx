@@ -22,6 +22,7 @@ function getTitle(pathname: string) {
   if (pathname === "/") return "Home";
   if (pathname.startsWith("/dashboard")) return "My dashboard";
   if (pathname.startsWith("/settings")) return "Account settings";
+  if (pathname.startsWith("/admin")) return "Admin";
   return "AE Comp";
 }
 
