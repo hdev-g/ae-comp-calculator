@@ -1,4 +1,5 @@
 import { SidebarNav } from "@/components/SidebarNav";
+import { AppHeader } from "@/components/AppHeader";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +10,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="h-[49px] w-full border-b border-zinc-200 bg-white" />
+          <header className="h-[49px] w-full border-b border-zinc-200 bg-white">
+            <AppHeader />
+          </header>
           <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
