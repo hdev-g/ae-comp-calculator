@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/attio/sync",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
+
