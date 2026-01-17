@@ -90,8 +90,8 @@ export default async function DashboardPage(props: {
   const closedWonDeals = deals.filter((d) => d.status === "Closed Won");
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950">
-      <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="px-6 py-10">
+      <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-6">
           <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>

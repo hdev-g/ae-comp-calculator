@@ -125,16 +125,14 @@ export default async function Home(props: {
   });
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950">
-      <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="px-6 py-10">
+      <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-6">
           <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="text-sm text-zinc-600">Quarter Overview</div>
               <h1 className="text-2xl font-semibold tracking-tight">{formatQuarter(year, quarter)}</h1>
-              <div className="mt-1 text-sm text-zinc-600">
-                Consolidated view across all AEs (mock data for now).
-              </div>
+              <div className="mt-1 text-sm text-zinc-600">Consolidated view across all AEs (mock data for now).</div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -144,14 +142,6 @@ export default async function Home(props: {
               >
                 View my dashboard
               </Link>
-              <a
-                href="https://github.com/hdev-g/ae-comp-calculator"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800"
-              >
-                Repo
-              </a>
             </div>
           </header>
 
@@ -229,3 +219,4 @@ export default async function Home(props: {
     </div>
   );
 }
+
