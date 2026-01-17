@@ -211,25 +211,31 @@ export async function findWorkspaceMemberByEmail(email: string): Promise<AttioWo
     const m = asRecord(item);
     if (!m) continue;
 
-    const attributes = asRecord(m["attributes"]);
-    const user = asRecord(m["user"]);
-
     const memberEmail =
-      (getString(m["email"]) ?? getString(attributes?.["email"]) ?? getString(user?.["email"]) ?? "")
+      (getString(m["email"]) ??
+        getString(m["email_address"]) ??
+        getString(asRecord(m["attributes"])?.["email"]) ??
+        getString(asRecord(m["user"])?.["email"]) ??
+        "")
         .toString()
         .toLowerCase();
     if (memberEmail === normalized) {
+      const idObj = asRecord(m["id"]);
       return {
-        id: (
-          getString(m["id"]) ??
-          getString(m["workspace_member_id"]) ??
-          getString(m["workspaceMemberId"]) ??
-          ""
-        ).toString(),
+        id:
+          (getString(m["id"]) ??
+            getString(idObj?.["workspace_member_id"]) ??
+            getString(idObj?.["workspaceMemberId"]) ??
+            getString(m["workspace_member_id"]) ??
+            getString(m["workspaceMemberId"]) ??
+            "")?.toString() ?? "",
         email: memberEmail,
-        name: (getString(m["name"]) ?? getString(m["full_name"]) ?? getString(m["fullName"]) ?? null) as
-          | string
-          | null,
+        name:
+          (getString(m["name"]) ??
+            getString(m["full_name"]) ??
+            getString(m["fullName"]) ??
+            [getString(m["first_name"]), getString(m["last_name"])].filter(Boolean).join(" ").trim() ??
+            null) as string | null,
       };
     }
   }

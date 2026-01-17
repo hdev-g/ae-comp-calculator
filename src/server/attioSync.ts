@@ -1,5 +1,6 @@
 import { listDealsRaw, listWorkspaceMembersRaw, parseDealRecord } from "@/server/attioClient";
 import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
+import { reconcileUsersToAttioByEmail } from "@/server/userAttioLinking";
 import { prisma } from "@/server/db";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -42,6 +43,9 @@ export type AttioSyncResult = {
   membersUpserted: number;
   dealsUpserted: number;
   dealsAssigned: number;
+  aeProfilesLinked: number;
+  aeProfilesUpdated: number;
+  aeLinkConflicts: number;
 };
 
 export async function runAttioSync(params: { actorUserId: string | null }): Promise<AttioSyncResult> {
@@ -142,7 +146,16 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
     membersUpserted: memberUpserts.filter(Boolean).length,
     dealsUpserted: dealUpserts.length,
     dealsAssigned: 0,
+    aeProfilesLinked: 0,
+    aeProfilesUpdated: 0,
+    aeLinkConflicts: 0,
   };
+
+  // Ensure AEProfiles are linked to Attio members by email, then assign deals accordingly.
+  const linkRes = await reconcileUsersToAttioByEmail();
+  result.aeProfilesLinked = linkRes.aeProfilesLinked;
+  result.aeProfilesUpdated = linkRes.aeProfilesUpdated;
+  result.aeLinkConflicts = linkRes.conflicts;
 
   // Optional cleanup: remove any previously-synced non-won deals so the DB stays lean.
   if ((process.env.ATTIO_PURGE_NON_WON ?? "false").toLowerCase() === "true") {
