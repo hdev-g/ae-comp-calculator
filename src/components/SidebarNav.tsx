@@ -21,22 +21,6 @@ function ChevronDownIcon(props: { className?: string }) {
   );
 }
 
-function PanelIcon(props: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-      className={props.className}
-    >
-      <path d="M3.5 4.5h13a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
-      <path d="M7 4.5v11" />
-    </svg>
-  );
-}
-
 function ExpandSidebarIcon(props: { className?: string }) {
   return (
     <svg

@@ -33,7 +33,22 @@ async function attioFetch(path: string, init?: RequestInit) {
     throw new Error(`Attio API error ${res.status} ${res.statusText}: ${text}`);
   }
 
-  return res.json() as Promise<any>;
+  return (await res.json()) as unknown;
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+}
+
+function getString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+function getMembersArray(data: unknown): unknown[] {
+  const rec = asRecord(data);
+  if (!rec) return [];
+  const candidate = rec["data"] ?? rec["workspace_members"] ?? rec["members"];
+  return Array.isArray(candidate) ? candidate : [];
 }
 
 /**
@@ -48,20 +63,31 @@ export async function findWorkspaceMemberByEmail(email: string): Promise<AttioWo
   // we can adjust once you confirm the exact endpoint/response shape from Attio docs.
   const data = await attioFetch("/workspace_members");
 
-  const items: any[] =
-    data?.data ??
-    data?.workspace_members ??
-    data?.members ??
-    [];
+  const items = getMembersArray(data);
 
-  for (const m of items) {
+  for (const item of items) {
+    const m = asRecord(item);
+    if (!m) continue;
+
+    const attributes = asRecord(m["attributes"]);
+    const user = asRecord(m["user"]);
+
     const memberEmail =
-      (m?.email ?? m?.attributes?.email ?? m?.user?.email ?? "").toString().toLowerCase();
+      (getString(m["email"]) ?? getString(attributes?.["email"]) ?? getString(user?.["email"]) ?? "")
+        .toString()
+        .toLowerCase();
     if (memberEmail === normalized) {
       return {
-        id: (m?.id ?? m?.workspace_member_id ?? m?.workspaceMemberId ?? "").toString(),
+        id: (
+          getString(m["id"]) ??
+          getString(m["workspace_member_id"]) ??
+          getString(m["workspaceMemberId"]) ??
+          ""
+        ).toString(),
         email: memberEmail,
-        name: (m?.name ?? m?.full_name ?? m?.fullName ?? null) as string | null,
+        name: (getString(m["name"]) ?? getString(m["full_name"]) ?? getString(m["fullName"]) ?? null) as
+          | string
+          | null,
       };
     }
   }

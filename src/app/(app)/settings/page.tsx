@@ -6,7 +6,7 @@ import { prisma } from "@/server/db";
 export default async function AccountSettingsPage() {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email?.toLowerCase() ?? null;
-  const userId = (session?.user as any)?.id?.toString?.() ?? null;
+  const userId = session?.user?.id ?? null;
 
   const user =
     (userId
@@ -49,7 +49,7 @@ export default async function AccountSettingsPage() {
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="text-zinc-600">Role</div>
-              <div className="font-medium text-zinc-950">{user?.role ?? (session?.user as any)?.role ?? "—"}</div>
+              <div className="font-medium text-zinc-950">{user?.role ?? session?.user?.role ?? "—"}</div>
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="text-zinc-600">Attio member linked</div>

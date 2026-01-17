@@ -6,7 +6,6 @@ import {
   getPreviousQuarter,
   getQuarterDateRangeUTC,
   getQuarterForDate,
-  type Quarter,
 } from "@/lib/quarters";
 
 function formatCurrency(n: number) {
@@ -15,13 +14,6 @@ function formatCurrency(n: number) {
 
 function formatPercent(n: number) {
   return `${(n * 100).toFixed(2)}%`;
-}
-
-function getDefaultYearQuarter(): { year: number; quarter: Quarter } {
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const quarter = (Math.floor(now.getUTCMonth() / 3) + 1) as Quarter;
-  return { year, quarter };
 }
 
 type DashboardView = "ytd" | "qtd" | "prevq";

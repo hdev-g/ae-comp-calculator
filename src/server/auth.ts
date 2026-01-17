@@ -1,4 +1,5 @@
-import type { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions, Profile } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 
 import { prisma } from "@/server/db";
@@ -16,6 +17,21 @@ function isSeedAdmin(email: string): boolean {
   const admins = getSeedAdminEmails();
   if (admins.length === 0) return false;
   return admins.includes(email.toLowerCase());
+}
+
+function getProfileSub(profile: Profile): string | null {
+  const rec = profile as unknown as Record<string, unknown>;
+  const sub = rec["sub"];
+  return typeof sub === "string" ? sub : null;
+}
+
+function getProfileName(profile: Profile): string | null {
+  if (profile.name) return profile.name.toString();
+  const rec = profile as unknown as Record<string, unknown>;
+  const given = rec["given_name"];
+  const family = rec["family_name"];
+  const full = [given, family].filter((v) => typeof v === "string" && v.trim().length > 0).join(" ");
+  return full ? full : null;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -36,7 +52,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ profile }) {
       const email = (profile?.email ?? "").toString().toLowerCase();
-      const googleSub = (profile as any)?.sub?.toString();
+      const googleSub = profile ? getProfileSub(profile) : null;
 
       if (!email || !googleSub) return false;
       if (!isEmailAllowed(email)) return false;
@@ -47,14 +63,14 @@ export const authOptions: NextAuthOptions = {
         where: { googleSub },
         update: {
           email,
-          fullName: (profile?.name ?? profile?.given_name ?? profile?.family_name ?? null)?.toString() ?? null,
+          fullName: profile ? getProfileName(profile) : null,
           role,
           status: "ACTIVE",
         },
         create: {
           email,
           googleSub,
-          fullName: (profile?.name ?? null)?.toString() ?? null,
+          fullName: profile ? getProfileName(profile) : null,
           role,
           status: "ACTIVE",
         },
@@ -88,10 +104,11 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, account, profile }) {
+      const t = token as JWT;
       // Only on initial sign-in, persist app user id/role in the JWT.
       if (account?.provider === "google" && profile) {
-        const googleSub = (profile as any)?.sub?.toString();
-        const email = (profile as any)?.email?.toString()?.toLowerCase();
+        const googleSub = getProfileSub(profile);
+        const email = (profile.email ?? "").toString().toLowerCase();
 
         const user =
           (googleSub
@@ -100,15 +117,16 @@ export const authOptions: NextAuthOptions = {
           (email ? await prisma.user.findUnique({ where: { email }, select: { id: true, role: true } }) : null);
 
         if (user) {
-          (token as any).appUserId = user.id;
-          (token as any).role = user.role;
+          t.appUserId = user.id;
+          t.role = user.role;
         }
       }
-      return token;
+      return t;
     },
     async session({ session, token }) {
-      (session.user as any).id = (token as any).appUserId;
-      (session.user as any).role = (token as any).role;
+      const t = token as JWT;
+      session.user.id = t.appUserId;
+      session.user.role = t.role;
       return session;
     },
   },

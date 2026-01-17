@@ -10,17 +10,14 @@ function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 export function AppShell(props: { children: React.ReactNode }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  // Optional persistence (nice UX; safe default if storage not available)
-  useEffect(() => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
-      const stored = window.localStorage.getItem("sidebarCollapsed");
-      if (stored === "true") setSidebarCollapsed(true);
+      return window.localStorage.getItem("sidebarCollapsed") === "true";
     } catch {
-      // ignore
+      return false;
     }
-  }, []);
+  });
 
   useEffect(() => {
     try {

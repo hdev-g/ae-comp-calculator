@@ -1,5 +1,4 @@
 import type { Deal } from "@/lib/commission";
-import type { Quarter } from "@/lib/quarters";
 
 export type AE = {
   id: string;
