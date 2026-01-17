@@ -55,12 +55,15 @@ export function AttioEmailLinker(props: {
       <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm">
         {props.linkedMember?.id ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-zinc-700">
-              Connected to{" "}
-              <span className="font-medium text-zinc-900">{props.linkedMember.fullName ?? "Attio user"}</span>
-              {props.linkedMember.email ? <span className="text-zinc-600"> ({props.linkedMember.email})</span> : null}
+            <div className="flex items-center gap-2 text-zinc-700">
+              <span className="inline-block size-2 rounded-full bg-emerald-500" aria-hidden="true" />
+              <span className="font-medium text-zinc-900">Connected</span>
+              {props.linkedMember.fullName || props.linkedMember.email ? (
+                <span className="text-zinc-600">
+                  — {props.linkedMember.fullName ?? props.linkedMember.email}
+                </span>
+              ) : null}
             </div>
-            <div className="font-mono text-xs text-zinc-600">{props.linkedMember.id}</div>
           </div>
         ) : props.suggestedMember?.id ? (
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

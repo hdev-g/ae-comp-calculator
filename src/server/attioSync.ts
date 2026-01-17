@@ -2,6 +2,39 @@ import { listDealsRaw, listWorkspaceMembersRaw, parseDealRecord } from "@/server
 import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
 import { prisma } from "@/server/db";
 
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+}
+
+function pickString(...vals: unknown[]): string | null {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return null;
+}
+
+function extractWorkspaceMemberId(raw: unknown): string | null {
+  const rec = asRecord(raw);
+  if (!rec) return null;
+
+  const direct =
+    pickString(rec["id"], rec["workspace_member_id"], rec["workspaceMemberId"]) ??
+    pickString(asRecord(rec["data"])?.["id"], asRecord(rec["data"])?.["workspace_member_id"]);
+
+  if (direct) return direct;
+
+  // Sometimes `id` is nested, e.g. { id: "<uuid>" } or { workspace_member_id: "<uuid>" }.
+  const idObj = asRecord(rec["id"]);
+  if (idObj) {
+    return (
+      pickString(idObj["id"], idObj["workspace_member_id"], idObj["workspaceMemberId"]) ??
+      pickString(asRecord(idObj["data"])?.["id"], asRecord(idObj["data"])?.["workspace_member_id"])
+    );
+  }
+
+  return null;
+}
+
 export type AttioSyncResult = {
   membersFetched: number;
   dealsFetched: number;
@@ -18,11 +51,37 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
   const memberUpserts = await Promise.all(
     membersRaw.map(async (raw) => {
       const rec = raw as Record<string, any>;
-      const id = (rec?.id ?? rec?.workspace_member_id ?? rec?.workspaceMemberId ?? "").toString();
+      const id = extractWorkspaceMemberId(raw);
       if (!id) return null;
-      const email = (rec?.email ?? rec?.attributes?.email ?? rec?.user?.email ?? null)?.toString() ?? null;
-      const fullName = (rec?.name ?? rec?.full_name ?? rec?.fullName ?? null)?.toString() ?? null;
-      const status = (rec?.status ?? null)?.toString() ?? null;
+      const email = pickString(rec?.email, rec?.attributes?.email, rec?.user?.email)?.toLowerCase() ?? null;
+      const fullName = pickString(rec?.name, rec?.full_name, rec?.fullName) ?? null;
+      const status = pickString(rec?.status) ?? null;
+
+      // Repair/migrate: if we previously stored a bad primary key (e.g. "[object Object]") for the same email,
+      // we need to replace that row so future link-by-email yields a valid id.
+      if (email) {
+        const existingByEmail = await prisma.attioWorkspaceMember.findUnique({
+          where: { email },
+          select: { id: true },
+        });
+        if (existingByEmail && existingByEmail.id !== id) {
+          return prisma.$transaction(async (tx) => {
+            await tx.aEProfile.updateMany({
+              where: { attioWorkspaceMemberId: existingByEmail.id },
+              data: { attioWorkspaceMemberId: id },
+            });
+
+            // Safe because no FK references AttioWorkspaceMember directly.
+            await tx.attioWorkspaceMember.delete({ where: { id: existingByEmail.id } });
+
+            await tx.attioWorkspaceMember.create({
+              data: { id, email, fullName, status, rawAttioPayload: raw as any },
+              select: { id: true },
+            });
+            return { id };
+          });
+        }
+      }
 
       return prisma.attioWorkspaceMember.upsert({
         where: { id },
