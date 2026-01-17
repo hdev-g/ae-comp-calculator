@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import type { BonusRule, CommissionPlan } from "@/lib/commission";
 import { computeAeleaderboard, type AE, type DealWithAE } from "@/lib/leaderboard";
 import { formatQuarter, type Quarter } from "@/lib/quarters";
 
@@ -25,21 +24,6 @@ export default function Home() {
     { id: "ae-1", fullName: "Alex Johnson", email: "alex@wordsmith.ai" },
     { id: "ae-2", fullName: "Sam Lee", email: "sam@wordsmith.ai" },
     { id: "ae-3", fullName: "Taylor Rivera", email: "taylor@wordsmith.ai" },
-  ];
-
-  const plans: CommissionPlan[] = [
-    {
-      id: "plan-2026",
-      name: "2026 AE Plan",
-      effectiveStartDate: "2026-01-01T00:00:00.000Z",
-      baseCommissionRate: 0.1,
-    },
-  ];
-
-  const bonusRules: BonusRule[] = [
-    { id: "b1", commissionPlanId: "plan-2026", type: "multi_year", rateAdd: 0.01, enabled: true },
-    { id: "b2", commissionPlanId: "plan-2026", type: "testimonial", rateAdd: 0.01, enabled: true },
-    { id: "b3", commissionPlanId: "plan-2026", type: "marketing", rateAdd: 0.01, enabled: true },
   ];
 
   const deals: DealWithAE[] = [
@@ -101,8 +85,6 @@ export default function Home() {
     quarter,
     aes,
     deals,
-    plans,
-    bonusRules,
     closedWonValue: "Closed Won",
   });
 
@@ -155,7 +137,7 @@ export default function Home() {
           <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
             <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
               <div className="text-sm font-medium">AE Leaderboard</div>
-              <div className="text-xs text-zinc-500">Sorted by commission earned</div>
+              <div className="text-xs text-zinc-500">Sorted by Closed Won amount</div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
@@ -165,7 +147,6 @@ export default function Home() {
                     <th className="px-5 py-3 font-medium">AE</th>
                     <th className="px-5 py-3 font-medium">Deals</th>
                     <th className="px-5 py-3 font-medium">Closed Won</th>
-                    <th className="px-5 py-3 font-medium">Commission</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -178,9 +159,6 @@ export default function Home() {
                       </td>
                       <td className="px-5 py-4 text-zinc-700">{r.dealCount}</td>
                       <td className="px-5 py-4 text-zinc-700">{formatCurrency(r.closedWonAmount)}</td>
-                      <td className="px-5 py-4 font-medium text-zinc-950">
-                        {formatCurrency(r.commissionEarned)}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
