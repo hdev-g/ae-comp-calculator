@@ -113,6 +113,15 @@ export function SidebarNav(props: { onToggleCollapsed: () => void }) {
                 >
                   Account settings
                 </Link>
+                <div className="h-px bg-zinc-200" />
+                <a
+                  href="/api/auth/signout?callbackUrl=/login"
+                  role="menuitem"
+                  className="block px-3 py-2 text-[14px] leading-5 text-zinc-900 hover:bg-zinc-50"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Sign out
+                </a>
               </div>
             ) : null}
           </div>
