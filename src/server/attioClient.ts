@@ -376,6 +376,7 @@ export async function listDealsRaw(): Promise<unknown[]> {
     const wonFilter = getWonFilter();
 
     const onlyWon = (process.env.ATTIO_DEALS_ONLY_WON ?? "true").toLowerCase() !== "false";
+    let didFallbackToUnfiltered = false;
 
     for (let i = 0; i < 50; i++) {
       const body: Record<string, unknown> = { limit: 200, include };
@@ -399,6 +400,32 @@ export async function listDealsRaw(): Promise<unknown[]> {
         }
       }
       const batch = getDealsArray(data);
+      // Heuristic fallback: if the filter "works" but returns an unexpectedly tiny first page,
+      // it likely means our filter constraints don't match your workspace schema.
+      // In that case, fall back to an unfiltered query and let the app-side "won" parsing decide.
+      if (!didFallbackToUnfiltered && i === 0 && cursor === null && onlyWon && wonFilter && batch.length > 0 && batch.length < 50) {
+        console.warn(
+          `[attio] deals query filter returned only ${batch.length} records on first page; falling back to unfiltered query`,
+        );
+        didFallbackToUnfiltered = true;
+        all.length = 0;
+        cursor = null;
+        const fallbackBody: Record<string, unknown> = { limit: 200, include };
+        data = await attioFetch(path, { method: "POST", body: JSON.stringify(fallbackBody) });
+        const fallbackBatch = getDealsArray(data);
+        all.push(...fallbackBatch);
+
+        const rec0 = asRecord(data);
+        const next0 =
+          getString(rec0?.["next_cursor"]) ??
+          getString(rec0?.["nextCursor"]) ??
+          getString(asRecord(rec0?.["data"])?.["next_cursor"]) ??
+          getString(asRecord(rec0?.["data"])?.["nextCursor"]) ??
+          null;
+        if (!next0) break;
+        cursor = next0;
+        continue;
+      }
       all.push(...batch);
 
       const rec = asRecord(data);

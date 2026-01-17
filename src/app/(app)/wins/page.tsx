@@ -54,6 +54,7 @@ export default async function WinsPage() {
       amount: true,
       closeDate: true,
       status: true,
+      attioOwnerWorkspaceMemberId: true,
       aeProfile: {
         select: {
           user: { select: { fullName: true, email: true } },
@@ -61,6 +62,18 @@ export default async function WinsPage() {
       },
     },
   });
+
+  const ownerIds = Array.from(
+    new Set(wins.map((w) => w.attioOwnerWorkspaceMemberId).filter((v): v is string => Boolean(v))),
+  );
+  const owners =
+    ownerIds.length > 0
+      ? await prisma.attioWorkspaceMember.findMany({
+          where: { id: { in: ownerIds } },
+          select: { id: true, fullName: true, email: true },
+        })
+      : [];
+  const ownerById = new Map(owners.map((o) => [o.id, o]));
 
   const totalAmount = wins.reduce((acc, d) => acc + decimalToNumber(d.amount), 0);
 
@@ -97,7 +110,15 @@ export default async function WinsPage() {
                   <tbody>
                     {wins.map((d) => {
                       const ae = d.aeProfile?.user;
-                      const aeLabel = ae?.fullName ?? ae?.email ?? "Unassigned";
+                      const owner = d.attioOwnerWorkspaceMemberId
+                        ? ownerById.get(d.attioOwnerWorkspaceMemberId) ?? null
+                        : null;
+                      const aeLabel =
+                        ae?.fullName ??
+                        ae?.email ??
+                        owner?.fullName ??
+                        owner?.email ??
+                        (d.attioOwnerWorkspaceMemberId ? d.attioOwnerWorkspaceMemberId.slice(0, 8) + "…" : "Unassigned");
                       return (
                         <tr key={d.id} className="border-t border-zinc-100">
                           <td className="px-5 py-4">
