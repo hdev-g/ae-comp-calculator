@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import Image from "next/image";
 
 import { AttioEmailLinker } from "@/components/AttioEmailLinker";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 import { authOptions } from "@/server/auth";
 import { prisma } from "@/server/db";
 
@@ -25,18 +26,6 @@ function UserIcon(props: { className?: string }) {
   );
 }
 
-function TrashIcon(props: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={props.className}>
-      <path
-        fillRule="evenodd"
-        d="M7.5 2.75A.75.75 0 0 1 8.25 2h3.5a.75.75 0 0 1 .75.75V4h3a.75.75 0 0 1 0 1.5h-.78l-.77 11.02A2 2 0 0 1 13.96 18H6.04a2 2 0 0 1-1.99-1.48L3.28 5.5H2.5a.75.75 0 0 1 0-1.5h3V2.75ZM9 4h2V3.5H9V4Zm-2.2 2.5a.75.75 0 0 1 .8.7l.5 8a.75.75 0 0 1-1.5.1l-.5-8a.75.75 0 0 1 .7-.8Zm6.4.7a.75.75 0 1 0-1.5-.1l-.5 8a.75.75 0 1 0 1.5.1l.5-8Z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
-
 export default async function AccountSettingsPage() {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email?.toLowerCase() ?? null;
@@ -50,6 +39,7 @@ export default async function AccountSettingsPage() {
             email: true,
             fullName: true,
             role: true,
+            profileImageUrl: true,
             aeProfile: { select: { attioWorkspaceMemberId: true } },
           },
         })
@@ -61,12 +51,13 @@ export default async function AccountSettingsPage() {
             email: true,
             fullName: true,
             role: true,
+            profileImageUrl: true,
             aeProfile: { select: { attioWorkspaceMemberId: true } },
           },
         })
       : null);
 
-  const profileImage = session?.user?.image ?? null;
+  const profileImage = user?.profileImageUrl ?? session?.user?.image ?? null;
   const displayEmail = user?.email ?? session?.user?.email ?? "";
   const displayName = user?.fullName ?? session?.user?.name ?? "";
   const { firstName, lastName } = splitName(displayName);
@@ -121,28 +112,7 @@ export default async function AccountSettingsPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-500"
-                  disabled
-                  title="Coming soon"
-                >
-                  <span className="grid size-6 place-items-center rounded-md bg-white/10">
-                    <svg viewBox="0 0 20 20" fill="currentColor" className="size-4" aria-hidden="true">
-                      <path d="M4 5a2 2 0 0 1 2-2h2.5l.71-1.06A1.5 1.5 0 0 1 10.46 1h1.08a1.5 1.5 0 0 1 1.25.94L13.5 3H16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm6 2.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" />
-                    </svg>
-                  </span>
-                  Upload new image
-                </button>
-                <button
-                  type="button"
-                  aria-label="Remove profile picture"
-                  className="grid size-10 place-items-center rounded-lg border border-zinc-200 bg-white text-red-600 hover:bg-zinc-50"
-                  disabled
-                  title="Coming soon"
-                >
-                  <TrashIcon className="size-5" />
-                </button>
+                <ProfilePhotoUploader hasPhoto={Boolean(user?.profileImageUrl)} />
               </div>
             </div>
 

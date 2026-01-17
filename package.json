@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
+    "@vercel/blob": "^0.27.0",
     "next": "16.1.3",
     "next-auth": "^4.24.13",
     "prisma": "^6.2.1",
