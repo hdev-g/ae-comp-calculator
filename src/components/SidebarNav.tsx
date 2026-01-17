@@ -37,6 +37,23 @@ function PanelIcon(props: { className?: string }) {
   );
 }
 
+function ExpandSidebarIcon(props: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+      className={props.className}
+    >
+      <path d="M3.5 4.5h13a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
+      <path d="M6.75 4.5v11" />
+      <path d="M10.25 10l2-2v4l-2-2Z" />
+    </svg>
+  );
+}
+
 type NavItem = {
   href: string;
   label: string;
@@ -125,7 +142,7 @@ export function SidebarNav(props: { onToggleCollapsed: () => void }) {
               props.onToggleCollapsed();
             }}
           >
-            <PanelIcon className="size-5" />
+            <ExpandSidebarIcon className="size-5" />
           </button>
         </div>
       </div>
