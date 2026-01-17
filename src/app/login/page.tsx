@@ -12,19 +12,10 @@ export default function LoginPage() {
           </div>
 
           <h1 className="mt-6 text-center text-3xl font-semibold tracking-tight">Welcome</h1>
-          <p className="mt-3 text-center text-[14px] leading-5 text-zinc-600">
-            Log in to Wordsmith to continue
-          </p>
-
-          <div className="mt-8 flex items-center gap-4">
-            <div className="h-px flex-1 bg-zinc-200" />
-            <div className="text-xs font-medium text-zinc-500">OR</div>
-            <div className="h-px flex-1 bg-zinc-200" />
-          </div>
 
           <button
             type="button"
-            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 text-[14px] leading-5 font-medium text-zinc-900 hover:bg-zinc-50"
+            className="mt-8 inline-flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 text-[14px] leading-5 font-medium text-zinc-900 hover:bg-zinc-50"
             onClick={() => signIn("google", { callbackUrl: "/" })}
           >
             <span className="grid size-6 place-items-center">
