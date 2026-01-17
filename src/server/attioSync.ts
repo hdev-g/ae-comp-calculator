@@ -92,7 +92,11 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
     }),
   );
 
-  const parsedDeals = dealsRaw.map(parseDealRecord).filter(Boolean);
+  const parsedDeals = dealsRaw
+    .map(parseDealRecord)
+    .filter(Boolean)
+    // Regardless of what we fetched from Attio, only persist wins.
+    .filter((d) => (d!.status ?? "").toLowerCase().includes("won"));
 
   const dealUpserts = await Promise.all(
     parsedDeals.map((d) =>
@@ -132,6 +136,13 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
     dealsUpserted: dealUpserts.length,
     dealsAssigned: 0,
   };
+
+  // Optional cleanup: remove any previously-synced non-won deals so the DB stays lean.
+  if ((process.env.ATTIO_PURGE_NON_WON ?? "false").toLowerCase() === "true") {
+    await prisma.deal.deleteMany({
+      where: { NOT: { status: { contains: "won", mode: "insensitive" } } },
+    });
+  }
 
   // Map synced deals to AEProfiles (based on AEProfile.attioWorkspaceMemberId).
   const reconcile = await reconcileDealsToAEs();

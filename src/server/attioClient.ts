@@ -34,6 +34,63 @@ function getDealsPath() {
   return process.env.ATTIO_DEALS_PATH ?? "/objects/deals/records/query";
 }
 
+function getDealsInclude(): string[] {
+  // Keep payloads small: we only need these fields to power "Wins" and AE mapping.
+  const raw = process.env.ATTIO_DEALS_QUERY_INCLUDE;
+  if (raw && raw.trim()) {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [
+    "id",
+    "created_at",
+    "web_url",
+    "values.record_id",
+    "values.name",
+    "values.owner",
+    "values.stage",
+    "values.deal_forecast",
+    "values.value",
+    "values.won_loss_date",
+    "values.estimated_close_date",
+    "values.deal_value_local",
+    "values.associated_company",
+  ];
+}
+
+function getWonFilter(): Record<string, unknown> | null {
+  // Best-effort: Attio filters are workspace-specific. If you provide IDs, we can filter server-side.
+  // You can copy these ids from a record payload:
+  // - stage status: data.values.stage[0].status.id.status_id
+  // - deal_forecast option: data.values.deal_forecast[0].option.id.option_id
+  const stageStatusId = process.env.ATTIO_WON_STAGE_STATUS_ID?.trim();
+  const forecastOptionId = process.env.ATTIO_WON_FORECAST_OPTION_ID?.trim();
+
+  const clauses: Record<string, unknown>[] = [];
+
+  if (stageStatusId) {
+    clauses.push({
+      path: [["stage"]],
+      constraints: { status_id: stageStatusId },
+    });
+  }
+
+  if (forecastOptionId) {
+    clauses.push({
+      path: [["deal_forecast"]],
+      constraints: { option_id: forecastOptionId },
+    });
+  }
+
+  if (clauses.length === 0) return null;
+  if (clauses.length === 1) return clauses[0]!;
+
+  // Combine if both are provided.
+  return { operator: "and", clauses };
+}
+
 async function attioFetch(path: string, init?: RequestInit) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("ATTIO_API_KEY is not set");
@@ -306,12 +363,32 @@ export async function listDealsRaw(): Promise<unknown[]> {
   if (path.endsWith("/query")) {
     const all: unknown[] = [];
     let cursor: string | null = null;
+    const include = getDealsInclude();
+    const wonFilter = getWonFilter();
+
+    const onlyWon = (process.env.ATTIO_DEALS_ONLY_WON ?? "true").toLowerCase() !== "false";
 
     for (let i = 0; i < 50; i++) {
-      const body: Record<string, unknown> = { limit: 200 };
+      const body: Record<string, unknown> = { limit: 200, include };
       if (cursor) body["cursor"] = cursor;
+      if (onlyWon && wonFilter) body["filter"] = wonFilter;
 
-      const data = await attioFetch(path, { method: "POST", body: JSON.stringify(body) });
+      let data: unknown;
+      try {
+        data = await attioFetch(path, { method: "POST", body: JSON.stringify(body) });
+      } catch (e) {
+        // If Attio rejects our filter shape, fall back to unfiltered query so sync still works.
+        const msg = e instanceof Error ? e.message : "";
+        const isBadRequest = msg.includes("Attio API error 400") || msg.includes("Attio API error 422");
+        if (onlyWon && wonFilter && isBadRequest) {
+          console.warn("[attio] deals query filter rejected; falling back to unfiltered query");
+          const fallbackBody: Record<string, unknown> = { limit: 200, include };
+          if (cursor) fallbackBody["cursor"] = cursor;
+          data = await attioFetch(path, { method: "POST", body: JSON.stringify(fallbackBody) });
+        } else {
+          throw e;
+        }
+      }
       const batch = getDealsArray(data);
       all.push(...batch);
 
