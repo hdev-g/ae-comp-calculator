@@ -10,7 +10,15 @@ export async function POST() {
 
   const startedAt = new Date();
 
-  const [membersRaw, dealsRaw] = await Promise.all([listWorkspaceMembersRaw(), listDealsRaw()]);
+  let membersRaw: unknown[] = [];
+  let dealsRaw: unknown[] = [];
+  try {
+    [membersRaw, dealsRaw] = await Promise.all([listWorkspaceMembersRaw(), listDealsRaw()]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Attio sync failed";
+    console.error("[attio-sync]", e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 
   const memberUpserts = await Promise.all(
     membersRaw.map(async (raw) => {

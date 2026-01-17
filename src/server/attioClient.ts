@@ -30,7 +30,8 @@ function getWorkspaceMembersPath() {
 
 function getDealsPath() {
   // Default assumption; configurable because Attio API shapes vary by workspace/setup.
-  return process.env.ATTIO_DEALS_PATH ?? "/objects/deals/records";
+  // Attio commonly exposes record listing via a "query" endpoint.
+  return process.env.ATTIO_DEALS_PATH ?? "/objects/deals/records/query";
 }
 
 async function attioFetch(path: string, init?: RequestInit) {
@@ -81,7 +82,13 @@ function getMembersArray(data: unknown): unknown[] {
 function getDealsArray(data: unknown): unknown[] {
   const rec = asRecord(data);
   if (!rec) return [];
-  const candidate = rec["data"] ?? rec["records"] ?? rec["deals"];
+  const dataNode = rec["data"];
+  const dataRec = asRecord(dataNode);
+  const candidate =
+    (dataRec ? dataRec["records"] ?? dataRec["data"] : null) ??
+    rec["records"] ??
+    rec["deals"] ??
+    rec["data"];
   return Array.isArray(candidate) ? candidate : [];
 }
 
@@ -207,7 +214,37 @@ export function parseDealRecord(raw: unknown): AttioDealParsed | null {
 }
 
 export async function listDealsRaw(): Promise<unknown[]> {
-  const data = await attioFetch(getDealsPath());
+  const path = getDealsPath();
+
+  // If this is a query-style endpoint, use POST and attempt basic pagination.
+  if (path.endsWith("/query")) {
+    const all: unknown[] = [];
+    let cursor: string | null = null;
+
+    for (let i = 0; i < 50; i++) {
+      const body: Record<string, unknown> = { limit: 200 };
+      if (cursor) body["cursor"] = cursor;
+
+      const data = await attioFetch(path, { method: "POST", body: JSON.stringify(body) });
+      const batch = getDealsArray(data);
+      all.push(...batch);
+
+      const rec = asRecord(data);
+      const next =
+        getString(rec?.["next_cursor"]) ??
+        getString(rec?.["nextCursor"]) ??
+        getString(asRecord(rec?.["data"])?.["next_cursor"]) ??
+        getString(asRecord(rec?.["data"])?.["nextCursor"]) ??
+        null;
+
+      if (!next) break;
+      cursor = next;
+    }
+
+    return all;
+  }
+
+  const data = await attioFetch(path);
   return getDealsArray(data);
 }
 
