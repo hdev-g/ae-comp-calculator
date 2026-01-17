@@ -71,6 +71,20 @@ model AEProfile {
   @@index([status])
 }
 
+model AttioWorkspaceMember {
+  id       String  @id
+  email    String? @unique
+  fullName String?
+  status   String?
+
+  rawAttioPayload Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
 model CommissionPlan {
   id                 String    @id @default(cuid())
   name               String
@@ -107,6 +121,7 @@ model Deal {
   id            String  @id @default(cuid())
   attioRecordId String  @unique
   aeProfileId   String?
+  attioOwnerWorkspaceMemberId String?
 
   dealName             String
   accountName          String?
@@ -129,6 +144,7 @@ model Deal {
   updatedAt DateTime @updatedAt
 
   @@index([aeProfileId, closeDate])
+  @@index([attioOwnerWorkspaceMemberId, closeDate])
   @@index([status])
 }
 
