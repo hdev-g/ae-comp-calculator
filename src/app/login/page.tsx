@@ -1,7 +1,5 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -13,10 +11,9 @@ export default function LoginPage() {
 
           <h1 className="mt-6 text-center text-3xl font-semibold tracking-tight">Welcome</h1>
 
-          <button
-            type="button"
+          <a
+            href="/api/auth/signin/google?callbackUrl=%2F"
             className="mt-8 inline-flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 text-[14px] leading-5 font-medium text-zinc-900 hover:bg-zinc-50"
-            onClick={() => signIn("google", { callbackUrl: "/" })}
           >
             <span className="grid size-6 place-items-center">
               <svg viewBox="0 0 48 48" className="size-5" aria-hidden="true">
@@ -39,7 +36,7 @@ export default function LoginPage() {
               </svg>
             </span>
             Continue with Google
-          </button>
+          </a>
 
           <p className="mt-6 text-center text-xs text-zinc-500">
             Google is the only supported login method. Contact an admin if you need access.

@@ -19,6 +19,8 @@ function isSeedAdmin(email: string): boolean {
 }
 
 export const authOptions: NextAuthOptions = {
+  // NextAuth v4 expects NEXTAUTH_SECRET; allow AUTH_SECRET for convenience.
+  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
