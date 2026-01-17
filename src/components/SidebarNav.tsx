@@ -51,7 +51,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function SidebarNav() {
+export function SidebarNav(props: { onToggleCollapsed: () => void }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
@@ -81,33 +81,20 @@ export function SidebarNav() {
       {/* Header (matches screenshot styling; swap mark once icon is uploaded) */}
       <div className="h-[49px] border-b border-zinc-200 bg-white px-3">
         <div className="flex h-full items-center justify-between">
-          <button
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-controls={menuId}
-            className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] leading-5 font-semibold text-zinc-950 hover:bg-zinc-50"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <div className="grid size-7 place-items-center rounded-md bg-white ring-1 ring-zinc-200">
-              <img
-                src="/wordsmith-logo.svg"
-                alt="Wordsmith"
-                className="size-4.5"
-              />
-            </div>
-            <span className="truncate">Wordsmith</span>
-            <ChevronDownIcon className="size-4 text-zinc-500" />
-          </button>
-
           <div className="relative" ref={menuWrapRef}>
             <button
               type="button"
-              aria-label="Sidebar options"
-              className="grid size-9 place-items-center rounded-md text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-controls={menuId}
+              className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] leading-5 font-semibold text-zinc-950 hover:bg-zinc-50"
               onClick={() => setMenuOpen((v) => !v)}
             >
-              <PanelIcon className="size-5" />
+              <div className="grid size-7 place-items-center rounded-md bg-white ring-1 ring-zinc-200">
+                <img src="/wordsmith-logo.svg" alt="Wordsmith" className="size-4.5" />
+              </div>
+              <span className="truncate">Wordsmith</span>
+              <ChevronDownIcon className="size-4 text-zinc-500" />
             </button>
 
             {menuOpen ? (
@@ -115,7 +102,7 @@ export function SidebarNav() {
                 id={menuId}
                 role="menu"
                 aria-label="Workspace menu"
-                className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
+                className="absolute left-0 top-11 z-50 w-56 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
               >
                 <Link
                   href="/settings"
@@ -128,6 +115,18 @@ export function SidebarNav() {
               </div>
             ) : null}
           </div>
+
+          <button
+            type="button"
+            aria-label="Collapse sidebar"
+            className="grid size-9 place-items-center rounded-md text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950"
+            onClick={() => {
+              setMenuOpen(false);
+              props.onToggleCollapsed();
+            }}
+          >
+            <PanelIcon className="size-5" />
+          </button>
         </div>
       </div>
 

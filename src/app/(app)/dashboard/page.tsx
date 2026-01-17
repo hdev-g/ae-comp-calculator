@@ -5,6 +5,7 @@ import {
   formatQuarter,
   getPreviousQuarter,
   getQuarterDateRangeUTC,
+  getQuarterForDate,
   type Quarter,
 } from "@/lib/quarters";
 
@@ -43,14 +44,12 @@ function filterDealsByCloseDateRange(deals: Deal[], start: Date, end: Date) {
 }
 
 export default async function DashboardPage(props: {
-  searchParams?: Promise<{ year?: string; quarter?: string; view?: string }>;
+  searchParams?: Promise<{ view?: string }>;
 }) {
   const sp = (await props.searchParams) ?? {};
-  const fallback = getDefaultYearQuarter();
-  const year = Number(sp.year ?? fallback.year);
-  const quarter = Number(sp.quarter ?? fallback.quarter) as Quarter;
   const view: DashboardView = isDashboardView(sp.view) ? sp.view : "qtd";
   const now = new Date();
+  const { year, quarter } = getQuarterForDate(now);
 
   // Mock data for UI iteration (auth/Attio/DB wired later)
   const plans: CommissionPlan[] = [
@@ -144,63 +143,6 @@ export default async function DashboardPage(props: {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
-                <Link
-                  href={{ pathname: "/dashboard", query: { year, quarter, view: "ytd" } }}
-                  className={`rounded-md px-3 py-1.5 ${view === "ytd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
-                >
-                  YTD
-                </Link>
-                <Link
-                  href={{ pathname: "/dashboard", query: { year, quarter, view: "qtd" } }}
-                  className={`rounded-md px-3 py-1.5 ${view === "qtd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
-                >
-                  QTD
-                </Link>
-                <Link
-                  href={{ pathname: "/dashboard", query: { year, quarter, view: "prevq" } }}
-                  className={`rounded-md px-3 py-1.5 ${view === "prevq" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
-                >
-                  Prev Q
-                </Link>
-              </div>
-
-              <form className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-zinc-700" htmlFor="year">
-                  Year
-                </label>
-                <input
-                  id="year"
-                  name="year"
-                  defaultValue={year}
-                  inputMode="numeric"
-                  className="h-10 w-24 rounded-md border border-zinc-200 bg-white px-3 text-sm"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-zinc-700" htmlFor="quarter">
-                  Quarter
-                </label>
-                <select
-                  id="quarter"
-                  name="quarter"
-                  defaultValue={quarter}
-                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm"
-                >
-                  <option value={1}>Q1</option>
-                  <option value={2}>Q2</option>
-                  <option value={3}>Q3</option>
-                  <option value={4}>Q4</option>
-                </select>
-              </div>
-              <input type="hidden" name="view" value={view} />
-              <button className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800">
-                Update
-              </button>
-              </form>
-            </div>
           </header>
 
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -220,8 +162,31 @@ export default async function DashboardPage(props: {
 
           <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
             <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-              <div className="text-sm font-medium">Closed Won Deals</div>
-              <div className="text-xs text-zinc-500">Rates: base + additive bonuses</div>
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium">Closed Won Deals</div>
+                <div className="text-xs text-zinc-500">Rates: base + additive bonuses</div>
+              </div>
+
+              <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+                <Link
+                  href={{ pathname: "/dashboard", query: { view: "ytd" } }}
+                  className={`rounded-md px-3 py-1.5 ${view === "ytd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+                >
+                  YTD
+                </Link>
+                <Link
+                  href={{ pathname: "/dashboard", query: { view: "qtd" } }}
+                  className={`rounded-md px-3 py-1.5 ${view === "qtd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+                >
+                  QTD
+                </Link>
+                <Link
+                  href={{ pathname: "/dashboard", query: { view: "prevq" } }}
+                  className={`rounded-md px-3 py-1.5 ${view === "prevq" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+                >
+                  Prev Q
+                </Link>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
