@@ -1,0 +1,197 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  AE
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AEProfileStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum QuarterlyStatementStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  fullName  String?
+  googleSub String     @unique
+  role      UserRole   @default(AE)
+  status    UserStatus @default(ACTIVE)
+
+  aeProfile AEProfile?
+
+  approvedStatements QuarterlyStatement[] @relation("StatementApprovedBy")
+  auditLogs          AuditLog[]           @relation("AuditActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, status])
+}
+
+model AEProfile {
+  id                     String          @id @default(cuid())
+  userId                 String          @unique
+  annualCommissionAmount Decimal?
+  attioWorkspaceMemberId String?         @unique
+  status                 AEProfileStatus @default(ACTIVE)
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+  statements QuarterlyStatement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model CommissionPlan {
+  id                 String    @id @default(cuid())
+  name               String
+  effectiveStartDate DateTime
+  effectiveEndDate   DateTime?
+  baseCommissionRate Decimal
+
+  bonusRules BonusRule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([effectiveStartDate, effectiveEndDate])
+}
+
+model BonusRule {
+  id               String  @id @default(cuid())
+  commissionPlanId String
+  type             String
+  rateAdd          Decimal
+  criteriaJson     Json
+  enabled          Boolean @default(true)
+
+  commissionPlan CommissionPlan @relation(fields: [commissionPlanId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([commissionPlanId, enabled])
+  @@index([type])
+}
+
+model Deal {
+  id            String  @id @default(cuid())
+  attioRecordId String  @unique
+  aeProfileId   String?
+
+  dealName             String
+  accountName          String?
+  amount               Decimal
+  commissionableAmount Decimal
+  closeDate            DateTime
+  status               String
+
+  termLengthMonths         Int?
+  isMultiYear              Boolean @default(false)
+  hasTestimonialCommitment Boolean @default(false)
+  hasMarketingCommitment   Boolean @default(false)
+
+  rawAttioPayload Json?
+
+  aeProfile          AEProfile?          @relation(fields: [aeProfileId], references: [id], onDelete: SetNull)
+  statementLineItems StatementLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([aeProfileId, closeDate])
+  @@index([status])
+}
+
+model QuarterlyStatement {
+  id          String                   @id @default(cuid())
+  aeProfileId String
+  year        Int
+  quarter     Int
+  status      QuarterlyStatementStatus @default(DRAFT)
+
+  lockedAt         DateTime?
+  approvedByUserId String?
+  approvedAt       DateTime?
+
+  totalCommission      Decimal @default(0)
+  totalClosedWonAmount Decimal @default(0)
+
+  aeProfile  AEProfile           @relation(fields: [aeProfileId], references: [id], onDelete: Cascade)
+  approvedBy User?               @relation("StatementApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  lineItems  StatementLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([aeProfileId, year, quarter])
+  @@index([status])
+}
+
+model StatementLineItem {
+  id                   String  @id @default(cuid())
+  quarterlyStatementId String
+  dealId               String?
+
+  appliedBaseRate           Decimal
+  appliedBonusBreakdownJson Json
+  appliedTotalRate          Decimal
+
+  commissionableAmount Decimal
+  commissionAmount     Decimal
+
+  quarterlyStatement QuarterlyStatement @relation(fields: [quarterlyStatementId], references: [id], onDelete: Cascade)
+  deal               Deal?              @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quarterlyStatementId])
+  @@index([dealId])
+}
+
+model AuditLog {
+  id          String  @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  detailsJson Json?
+
+  actorUser User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+}
