@@ -62,8 +62,12 @@ export function SidebarNav() {
             type="button"
             className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-zinc-950 hover:bg-zinc-50"
           >
-            <div className="grid size-7 place-items-center rounded-md bg-zinc-100 ring-1 ring-zinc-200">
-              <div className="size-3.5 rounded-sm bg-zinc-900" />
+            <div className="grid size-7 place-items-center rounded-md bg-white ring-1 ring-zinc-200">
+              <img
+                src="/wordsmith-logo.svg"
+                alt="Wordsmith"
+                className="size-4.5"
+              />
             </div>
             <span className="truncate">Wordsmith</span>
             <ChevronDownIcon className="size-4 text-zinc-500" />
