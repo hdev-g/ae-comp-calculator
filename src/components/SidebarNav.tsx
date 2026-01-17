@@ -56,23 +56,23 @@ export function SidebarNav() {
   return (
     <nav className="flex h-full flex-col">
       {/* Header (matches screenshot styling; swap mark once icon is uploaded) */}
-      <div className="border-b border-zinc-800 bg-zinc-950 px-3 py-3">
+      <div className="border-b border-zinc-200 bg-white px-3 py-3">
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-zinc-50 hover:bg-white/5"
+            className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-zinc-950 hover:bg-zinc-50"
           >
-            <div className="grid size-7 place-items-center rounded-md bg-orange-500/15 ring-1 ring-orange-500/30">
-              <div className="size-3.5 rounded-sm bg-orange-500" />
+            <div className="grid size-7 place-items-center rounded-md bg-zinc-100 ring-1 ring-zinc-200">
+              <div className="size-3.5 rounded-sm bg-zinc-900" />
             </div>
             <span className="truncate">Wordsmith</span>
-            <ChevronDownIcon className="size-4 text-zinc-400" />
+            <ChevronDownIcon className="size-4 text-zinc-500" />
           </button>
 
           <button
             type="button"
             aria-label="Sidebar options"
-            className="grid size-9 place-items-center rounded-md text-zinc-300 hover:bg-white/5 hover:text-zinc-50"
+            className="grid size-9 place-items-center rounded-md text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950"
           >
             <PanelIcon className="size-5" />
           </button>
