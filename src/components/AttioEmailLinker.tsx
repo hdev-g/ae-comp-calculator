@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -45,7 +46,12 @@ export function AttioEmailLinker(props: {
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4">
       <div className="flex flex-col gap-1">
-        <div className="text-sm font-medium text-zinc-900">Attio account</div>
+        <div className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+          <span className="relative size-5 overflow-hidden rounded-[6px] ring-1 ring-zinc-200">
+            <Image src="/attio-logo.png" alt="Attio" fill className="object-contain" />
+          </span>
+          <span>Attio account</span>
+        </div>
         <div className="text-sm text-zinc-600">
           We match your Attio workspace user based on your Google sign-in email:{" "}
           <span className="font-medium text-zinc-900">{props.email || "—"}</span>
