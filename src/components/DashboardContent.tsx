@@ -7,6 +7,8 @@ type BonusRule = {
   id: string;
   name: string;
   rateAdd: number;
+  attioAttributeId: string | null;
+  attioAttributeName: string | null;
 };
 
 type Deal = {
@@ -255,24 +257,33 @@ export function DashboardContent({
                         {bonusRules.map((rule) => {
                           const isEnabled = deal.appliedBonusRuleIds.includes(rule.id);
                           const isUpdating = updating === `${deal.id}-${rule.id}`;
+                          const isAttioControlled = !!rule.attioAttributeId;
                           return (
                             <td key={rule.id} className="px-3 py-4 text-center">
-                              <button
-                                type="button"
-                                onClick={() => toggleBonusRule(deal.id, rule.id, isEnabled)}
-                                disabled={isUpdating}
-                                className={`inline-flex size-8 items-center justify-center rounded-lg border transition-colors ${
-                                  isEnabled
-                                    ? "border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
-                                    : "border-zinc-200 bg-white text-zinc-400 hover:bg-zinc-50"
-                                } ${isUpdating ? "opacity-50" : ""}`}
-                              >
-                                {isEnabled ? (
-                                  <CheckIcon className="size-5" />
-                                ) : (
-                                  <XIcon className="size-5" />
+                              <div className="relative inline-block group">
+                                <button
+                                  type="button"
+                                  onClick={() => !isAttioControlled && toggleBonusRule(deal.id, rule.id, isEnabled)}
+                                  disabled={isUpdating || isAttioControlled}
+                                  className={`inline-flex size-8 items-center justify-center rounded-lg border transition-colors ${
+                                    isEnabled
+                                      ? "border-green-200 bg-green-50 text-green-600"
+                                      : "border-zinc-200 bg-white text-zinc-400"
+                                  } ${isAttioControlled ? "cursor-not-allowed opacity-70" : "hover:bg-zinc-50"} ${isUpdating ? "opacity-50" : ""}`}
+                                >
+                                  {isEnabled ? (
+                                    <CheckIcon className="size-5" />
+                                  ) : (
+                                    <XIcon className="size-5" />
+                                  )}
+                                </button>
+                                {isAttioControlled && (
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                    Synced from Attio
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800" />
+                                  </div>
                                 )}
-                              </button>
+                              </div>
                             </td>
                           );
                         })}

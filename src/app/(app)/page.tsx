@@ -202,7 +202,7 @@ export default async function DashboardPage(props: {
               baseCommissionRate: true,
               bonusRules: {
                 where: { enabled: true },
-                select: { id: true, name: true, rateAdd: true },
+                select: { id: true, name: true, rateAdd: true, attioAttributeId: true, attioAttributeName: true },
                 orderBy: { name: "asc" },
               },
               performanceAccelerators: {
@@ -234,7 +234,7 @@ export default async function DashboardPage(props: {
       id: string; 
       name: string; 
       baseCommissionRate: unknown;
-      bonusRules: { id: string; name: string; rateAdd: unknown }[];
+      bonusRules: { id: string; name: string; rateAdd: unknown; attioAttributeId: string | null; attioAttributeName: string | null }[];
       performanceAccelerators: { id: string; minAttainment: unknown; maxAttainment: unknown; commissionRate: unknown }[];
     } | null;
   } | null = null;
@@ -265,7 +265,7 @@ export default async function DashboardPage(props: {
             baseCommissionRate: true,
             bonusRules: {
               where: { enabled: true },
-              select: { id: true, name: true, rateAdd: true },
+              select: { id: true, name: true, rateAdd: true, attioAttributeId: true, attioAttributeName: true },
               orderBy: { name: "asc" },
             },
             performanceAccelerators: {
@@ -318,6 +318,8 @@ export default async function DashboardPage(props: {
     id: r.id,
     name: r.name,
     rateAdd: decimalToNumber(r.rateAdd),
+    attioAttributeId: r.attioAttributeId,
+    attioAttributeName: r.attioAttributeName,
   })) ?? [];
 
   // Get performance accelerators for the AE's commission plan
