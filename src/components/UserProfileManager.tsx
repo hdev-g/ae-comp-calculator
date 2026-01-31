@@ -55,6 +55,79 @@ function XIcon({ className }: { className?: string }) {
   );
 }
 
+// Input that only saves on blur (not on every keystroke)
+function DebouncedNumberInput({
+  value,
+  onSave,
+  disabled,
+  placeholder,
+  className,
+}: {
+  value: number | null;
+  onSave: (value: number) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [localValue, setLocalValue] = useState(value?.toString() ?? "");
+
+  // Sync local value when prop changes (e.g., after save)
+  useEffect(() => {
+    setLocalValue(value?.toString() ?? "");
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={() => {
+        const num = parseFloat(localValue);
+        if (!isNaN(num) && num > 0) {
+          onSave(num);
+        } else if (localValue === "" || localValue === "0") {
+          onSave(0);
+        }
+      }}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={className}
+    />
+  );
+}
+
+// Date input that only saves on blur
+function DebouncedDateInput({
+  value,
+  onSave,
+  disabled,
+  className,
+}: {
+  value: string | null;
+  onSave: (value: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [localValue, setLocalValue] = useState(value ? value.split("T")[0] : "");
+
+  useEffect(() => {
+    setLocalValue(value ? value.split("T")[0] : "");
+  }, [value]);
+
+  return (
+    <input
+      type="date"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={() => {
+        onSave(localValue);
+      }}
+      disabled={disabled}
+      className={className}
+    />
+  );
+}
+
 export function UserProfileManager() {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [commissionPlans, setCommissionPlans] = useState<CommissionPlanOption[]>([]);
@@ -236,13 +309,9 @@ export function UserProfileManager() {
                   <td className="px-2 py-4">
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-zinc-500">$</span>
-                      <input
-                        type="number"
-                        value={profile.annualTarget ? Number(profile.annualTarget) : ""}
-                        onChange={(e) => {
-                          const val = e.target.value ? parseFloat(e.target.value) : 0;
-                          handleUpdate(profile.id, "annualTarget", val);
-                        }}
+                      <DebouncedNumberInput
+                        value={profile.annualTarget ? Number(profile.annualTarget) : null}
+                        onSave={(val) => handleUpdate(profile.id, "annualTarget", val)}
                         placeholder="0"
                         disabled={saving === profile.id}
                         className="h-8 w-[90px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
@@ -250,10 +319,9 @@ export function UserProfileManager() {
                     </div>
                   </td>
                   <td className="px-2 py-4">
-                    <input
-                      type="date"
-                      value={profile.startDate ? profile.startDate.split("T")[0] : ""}
-                      onChange={(e) => handleUpdate(profile.id, "startDate", e.target.value)}
+                    <DebouncedDateInput
+                      value={profile.startDate}
+                      onSave={(val) => handleUpdate(profile.id, "startDate", val)}
                       disabled={saving === profile.id}
                       className="h-8 w-[110px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     />
