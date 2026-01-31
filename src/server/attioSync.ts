@@ -49,6 +49,153 @@ export type AttioSyncResult = {
   aeLinkConflicts: number;
 };
 
+type ParsedDeal = {
+  attioRecordId: string;
+  dealName: string;
+  accountName: string | null;
+  amount: number;
+  commissionableAmount: number;
+  closeDate: string;
+  status: string;
+  ownerWorkspaceMemberId: string | null;
+  raw: unknown;
+};
+
+/**
+ * Auto-applies bonus rules to deals based on Attio attribute mappings.
+ * If a bonus rule has an attioAttributeId configured and the deal's Attio
+ * attribute value is true/checked, the bonus rule is applied to the deal.
+ */
+async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | null)[]): Promise<void> {
+  // Get all bonus rules with Attio attribute mappings
+  const bonusRulesWithAttio = await prisma.bonusRule.findMany({
+    where: {
+      attioAttributeId: { not: null },
+      enabled: true,
+    },
+    select: {
+      id: true,
+      attioAttributeId: true,
+      commissionPlan: {
+        select: {
+          aeProfiles: {
+            select: { id: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (bonusRulesWithAttio.length === 0) return;
+
+  // Build a map of attioAttributeId -> bonus rule IDs
+  const attrToRules = new Map<string, string[]>();
+  for (const rule of bonusRulesWithAttio) {
+    if (!rule.attioAttributeId) continue;
+    const existing = attrToRules.get(rule.attioAttributeId) ?? [];
+    existing.push(rule.id);
+    attrToRules.set(rule.attioAttributeId, existing);
+  }
+
+  // Process each deal
+  for (const deal of parsedDeals) {
+    if (!deal) continue;
+
+    const dbDeal = await prisma.deal.findUnique({
+      where: { attioRecordId: deal.attioRecordId },
+      select: { id: true, aeProfileId: true, appliedBonusRuleIds: true },
+    });
+    if (!dbDeal) continue;
+
+    // Get the AE's commission plan's bonus rules
+    let eligibleRuleIds: string[] = [];
+    if (dbDeal.aeProfileId) {
+      const aeProfile = await prisma.aEProfile.findUnique({
+        where: { id: dbDeal.aeProfileId },
+        select: {
+          commissionPlan: {
+            select: {
+              bonusRules: {
+                where: { 
+                  attioAttributeId: { not: null },
+                  enabled: true,
+                },
+                select: { id: true, attioAttributeId: true },
+              },
+            },
+          },
+        },
+      });
+      eligibleRuleIds = aeProfile?.commissionPlan?.bonusRules.map(r => r.id) ?? [];
+    }
+
+    // Check the raw Attio payload for attribute values
+    const raw = asRecord(deal.raw);
+    const values = asRecord(raw?.values) ?? asRecord(raw?.attributes) ?? raw;
+    
+    const appliedRuleIds = new Set(dbDeal.appliedBonusRuleIds);
+
+    for (const [attrId, ruleIds] of attrToRules.entries()) {
+      // Check if attribute value is truthy (checkbox checked)
+      const attrValue = extractAttributeValue(values, attrId);
+      
+      for (const ruleId of ruleIds) {
+        // Only apply rules that the AE is eligible for
+        if (eligibleRuleIds.length > 0 && !eligibleRuleIds.includes(ruleId)) continue;
+        
+        if (attrValue === true) {
+          appliedRuleIds.add(ruleId);
+        }
+        // Note: We don't remove rules if attr is false, since they could be manually applied
+      }
+    }
+
+    // Update the deal if appliedBonusRuleIds changed
+    const newAppliedRuleIds = Array.from(appliedRuleIds);
+    if (newAppliedRuleIds.length !== dbDeal.appliedBonusRuleIds.length ||
+        !newAppliedRuleIds.every(id => dbDeal.appliedBonusRuleIds.includes(id))) {
+      await prisma.deal.update({
+        where: { id: dbDeal.id },
+        data: { appliedBonusRuleIds: newAppliedRuleIds },
+      });
+    }
+  }
+}
+
+/**
+ * Extracts a boolean attribute value from Attio's nested values structure.
+ */
+function extractAttributeValue(values: Record<string, unknown> | null, attrId: string): boolean {
+  if (!values) return false;
+
+  // Attio stores values in different formats, try common patterns
+  const attrData = values[attrId];
+  
+  if (attrData === true || attrData === "true") return true;
+  if (attrData === false || attrData === "false" || attrData === null || attrData === undefined) return false;
+
+  // Attio often wraps values in an array of objects with active_from/active_until
+  if (Array.isArray(attrData)) {
+    for (const item of attrData) {
+      const itemRec = asRecord(item);
+      if (!itemRec) continue;
+      // Checkbox type: look for value field
+      if (itemRec.value === true || itemRec.value === "true") return true;
+      // Sometimes it's a direct boolean at item level
+      if (itemRec.checked === true || itemRec.checked === "true") return true;
+    }
+  }
+
+  // Nested object with value field
+  const attrRec = asRecord(attrData);
+  if (attrRec) {
+    if (attrRec.value === true || attrRec.value === "true") return true;
+    if (attrRec.checked === true || attrRec.checked === "true") return true;
+  }
+
+  return false;
+}
+
 export async function runAttioSync(params: { actorUserId: string | null }): Promise<AttioSyncResult> {
   const startedAt = new Date();
   const [membersRaw, dealsRaw] = await Promise.all([listWorkspaceMembersRaw(), listDealsRaw()]);
@@ -173,6 +320,9 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
   // Map synced deals to AEProfiles (based on AEProfile.attioWorkspaceMemberId).
   const reconcile = await reconcileDealsToAEs();
   result.dealsAssigned = reconcile.dealsUpdated;
+
+  // Auto-apply bonus rules based on Attio attribute mappings
+  await applyBonusRulesFromAttioAttributes(parsedDeals);
 
   await prisma.auditLog.create({
     data: {

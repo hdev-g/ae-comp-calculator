@@ -9,6 +9,14 @@ type BonusRule = {
   effectiveStartDate: string | null;
   effectiveEndDate: string | null;
   enabled: boolean;
+  attioAttributeId: string | null;
+  attioAttributeName: string | null;
+};
+
+type AttioAttribute = {
+  id: string;
+  title: string;
+  type: string;
 };
 
 type PerformanceAccelerator = {
@@ -46,6 +54,10 @@ export function CommissionPlanManager() {
 
   const [editingPlan, setEditingPlan] = useState<CommissionPlan | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  
+  // Attio attributes for mapping
+  const [attioAttributes, setAttioAttributes] = useState<AttioAttribute[]>([]);
+  const [attioLoading, setAttioLoading] = useState(false);
 
   const fetchPlans = useCallback(async () => {
     setLoading(true);
@@ -62,9 +74,25 @@ export function CommissionPlanManager() {
     }
   }, []);
 
+  const fetchAttioAttributes = useCallback(async () => {
+    setAttioLoading(true);
+    try {
+      const res = await fetch("/api/attio/deal-attributes");
+      const data = (await res.json()) as { attributes?: AttioAttribute[]; error?: string };
+      if (res.ok && data.attributes) {
+        setAttioAttributes(data.attributes);
+      }
+    } catch (e) {
+      console.error("Failed to fetch Attio attributes:", e);
+    } finally {
+      setAttioLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPlans();
-  }, [fetchPlans]);
+    fetchAttioAttributes();
+  }, [fetchPlans, fetchAttioAttributes]);
 
   function handleCreate() {
     setEditingPlan({
@@ -135,6 +163,8 @@ export function CommissionPlanManager() {
           effectiveStartDate: r.effectiveStartDate || null,
           effectiveEndDate: r.effectiveEndDate || null,
           enabled: r.enabled,
+          attioAttributeId: r.attioAttributeId || null,
+          attioAttributeName: r.attioAttributeName || null,
         })),
         performanceAccelerators: plan.performanceAccelerators.map((a) => ({
           minAttainment: typeof a.minAttainment === "string" ? parseFloat(a.minAttainment as unknown as string) : a.minAttainment,
@@ -184,6 +214,8 @@ export function CommissionPlanManager() {
         isCreating={isCreating}
         onSave={handleSave}
         onCancel={handleCancel}
+        attioAttributes={attioAttributes}
+        attioLoading={attioLoading}
       />
     );
   }
@@ -236,6 +268,11 @@ export function CommissionPlanManager() {
                               +{formatPercent(r.rateAdd)}
                             </span>
                             <span>{r.name}</span>
+                            {r.attioAttributeName && (
+                              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">
+                                ↔ {r.attioAttributeName}
+                              </span>
+                            )}
                             {(r.effectiveStartDate || r.effectiveEndDate) && (
                               <span className="text-xs text-zinc-400">
                                 ({formatDate(r.effectiveStartDate) || "—"} → {formatDate(r.effectiveEndDate) || "ongoing"})
@@ -294,6 +331,8 @@ function PlanForm(props: {
   isCreating: boolean;
   onSave: (plan: CommissionPlan) => void;
   onCancel: () => void;
+  attioAttributes: AttioAttribute[];
+  attioLoading: boolean;
 }) {
   const [form, setForm] = useState(props.plan);
   const [saving, setSaving] = useState(false);
@@ -312,7 +351,9 @@ function PlanForm(props: {
           rateAdd: 0.01, 
           effectiveStartDate: null, 
           effectiveEndDate: null, 
-          enabled: true 
+          enabled: true,
+          attioAttributeId: null,
+          attioAttributeName: null,
         },
       ],
     }));
@@ -458,16 +499,47 @@ function PlanForm(props: {
               >
                 <div className="flex flex-wrap items-start gap-4">
                   {/* Rule Name */}
-                  <div className="min-w-[200px] flex-1">
+                  <div className="min-w-[160px] flex-1">
                     <label className="text-xs font-medium text-zinc-600">Rule Name</label>
                     <input
                       type="text"
                       value={rule.name}
                       onChange={(e) => updateBonusRule(index, { name: e.target.value })}
-                      placeholder="e.g. Multi-year deal, Annual prepayment"
+                      placeholder="e.g. Multi-year deal"
                       required
                       className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
                     />
+                  </div>
+
+                  {/* Attio Attribute Mapping */}
+                  <div className="w-48">
+                    <label className="text-xs font-medium text-zinc-600">Attio Attribute</label>
+                    <select
+                      value={rule.attioAttributeId ?? ""}
+                      onChange={(e) => {
+                        const selectedAttr = props.attioAttributes.find(a => a.id === e.target.value);
+                        updateBonusRule(index, { 
+                          attioAttributeId: e.target.value || null,
+                          attioAttributeName: selectedAttr?.title || null,
+                        });
+                      }}
+                      className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+                    >
+                      {props.attioLoading ? (
+                        <option value="">Loading...</option>
+                      ) : props.attioAttributes.length === 0 ? (
+                        <option value="">Manual only</option>
+                      ) : (
+                        <>
+                          <option value="">Manual only</option>
+                          {props.attioAttributes.map((attr) => (
+                            <option key={attr.id} value={attr.id}>
+                              {attr.title}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
                   </div>
 
                   {/* Bonus % */}

@@ -71,6 +71,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
               ? new Date(r.effectiveEndDate) 
               : null,
             enabled: r.enabled !== false,
+            attioAttributeId: typeof r.attioAttributeId === "string" && r.attioAttributeId 
+              ? r.attioAttributeId 
+              : null,
+            attioAttributeName: typeof r.attioAttributeName === "string" && r.attioAttributeName 
+              ? r.attioAttributeName 
+              : null,
           })),
       });
     }

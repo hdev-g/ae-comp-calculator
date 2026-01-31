@@ -137,6 +137,10 @@ model BonusRule {
   effectiveStartDate DateTime?
   effectiveEndDate   DateTime?
   enabled          Boolean @default(true)
+  
+  // Attio attribute mapping - when this Attio checkbox is true, auto-apply this rule
+  attioAttributeId   String?  // The Attio attribute ID (e.g., "multi_year")
+  attioAttributeName String?  // Human-readable name for display
 
   commissionPlan CommissionPlan @relation(fields: [commissionPlanId], references: [id], onDelete: Cascade)
 
