@@ -11,6 +11,13 @@ type BonusRule = {
   enabled: boolean;
 };
 
+type PerformanceAccelerator = {
+  id?: string;
+  minAttainment: number; // e.g., 0 for 0%, 100.1 for 100.1%
+  maxAttainment: number | null; // null means uncapped
+  commissionRate: number; // e.g., 0.10 for 10%
+};
+
 type CommissionPlan = {
   id: string;
   name: string;
@@ -18,6 +25,7 @@ type CommissionPlan = {
   effectiveEndDate: string | null;
   baseCommissionRate: string | number;
   bonusRules: BonusRule[];
+  performanceAccelerators: PerformanceAccelerator[];
 };
 
 function formatDate(dateStr: string | null): string {
@@ -66,6 +74,11 @@ export function CommissionPlanManager() {
       effectiveEndDate: null,
       baseCommissionRate: 0.1,
       bonusRules: [],
+      performanceAccelerators: [
+        { minAttainment: 0, maxAttainment: 100, commissionRate: 0.10 },
+        { minAttainment: 100.1, maxAttainment: 125, commissionRate: 0.115 },
+        { minAttainment: 125.1, maxAttainment: null, commissionRate: 0.125 },
+      ],
     });
     setIsCreating(true);
   }
@@ -79,6 +92,12 @@ export function CommissionPlanManager() {
         ...r,
         effectiveStartDate: r.effectiveStartDate ? formatDate(r.effectiveStartDate) : null,
         effectiveEndDate: r.effectiveEndDate ? formatDate(r.effectiveEndDate) : null,
+      })),
+      performanceAccelerators: (plan.performanceAccelerators ?? []).map((a) => ({
+        ...a,
+        minAttainment: parseFloat(String(a.minAttainment)),
+        maxAttainment: a.maxAttainment !== null ? parseFloat(String(a.maxAttainment)) : null,
+        commissionRate: parseFloat(String(a.commissionRate)),
       })),
     });
     setIsCreating(false);
@@ -116,6 +135,13 @@ export function CommissionPlanManager() {
           effectiveStartDate: r.effectiveStartDate || null,
           effectiveEndDate: r.effectiveEndDate || null,
           enabled: r.enabled,
+        })),
+        performanceAccelerators: plan.performanceAccelerators.map((a) => ({
+          minAttainment: typeof a.minAttainment === "string" ? parseFloat(a.minAttainment as unknown as string) : a.minAttainment,
+          maxAttainment: a.maxAttainment !== null 
+            ? (typeof a.maxAttainment === "string" ? parseFloat(a.maxAttainment as unknown as string) : a.maxAttainment)
+            : null,
+          commissionRate: typeof a.commissionRate === "string" ? parseFloat(a.commissionRate as unknown as string) : a.commissionRate,
         })),
       };
 
@@ -198,6 +224,7 @@ export function CommissionPlanManager() {
                   </div>
                   {plan.bonusRules.length > 0 && (
                     <div className="mt-3 flex flex-col gap-1">
+                      <div className="text-xs font-medium text-zinc-500">Bonus Rules:</div>
                       {plan.bonusRules
                         .filter((r) => r.enabled)
                         .map((r, idx) => (
@@ -216,6 +243,24 @@ export function CommissionPlanManager() {
                             )}
                           </div>
                         ))}
+                    </div>
+                  )}
+                  {(plan.performanceAccelerators ?? []).length > 0 && (
+                    <div className="mt-3 flex flex-col gap-1">
+                      <div className="text-xs font-medium text-zinc-500">Performance Accelerators:</div>
+                      {(plan.performanceAccelerators ?? []).map((a, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 text-sm text-zinc-600"
+                        >
+                          <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                            {formatPercent(a.commissionRate)}
+                          </span>
+                          <span>
+                            {a.minAttainment}% – {a.maxAttainment !== null ? `${a.maxAttainment}%` : "∞"}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -284,6 +329,32 @@ function PlanForm(props: {
     setForm((f) => ({
       ...f,
       bonusRules: f.bonusRules.filter((_, i) => i !== index),
+    }));
+  }
+
+  function addAccelerator() {
+    setForm((f) => ({
+      ...f,
+      performanceAccelerators: [
+        ...f.performanceAccelerators,
+        { minAttainment: 0, maxAttainment: null, commissionRate: 0.10 },
+      ],
+    }));
+  }
+
+  function updateAccelerator(index: number, updates: Partial<PerformanceAccelerator>) {
+    setForm((f) => ({
+      ...f,
+      performanceAccelerators: f.performanceAccelerators.map((a, i) => 
+        i === index ? { ...a, ...updates } : a
+      ),
+    }));
+  }
+
+  function removeAccelerator(index: number) {
+    setForm((f) => ({
+      ...f,
+      performanceAccelerators: f.performanceAccelerators.filter((_, i) => i !== index),
     }));
   }
 
@@ -459,6 +530,108 @@ function PlanForm(props: {
                     <button
                       type="button"
                       onClick={() => removeBonusRule(index)}
+                      className="text-sm text-red-600 hover:text-red-500"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Annual Performance Accelerators */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium text-zinc-900">Annual Performance Accelerators</div>
+            <p className="mt-1 text-sm text-zinc-500">
+              Commission rates based on annual quota attainment. Higher attainment = higher rates.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addAccelerator}
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Add Tier
+          </button>
+        </div>
+
+        {form.performanceAccelerators.length > 0 && (
+          <div className="mt-5 flex flex-col gap-4">
+            {form.performanceAccelerators.map((accelerator, index) => (
+              <div
+                key={index}
+                className="rounded-lg border border-violet-100 bg-violet-50 p-4"
+              >
+                <div className="flex flex-wrap items-start gap-4">
+                  {/* Min Attainment */}
+                  <div className="w-32">
+                    <label className="text-xs font-medium text-zinc-600">Min Attainment</label>
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={accelerator.minAttainment}
+                        onChange={(e) =>
+                          updateAccelerator(index, { minAttainment: parseFloat(e.target.value) || 0 })
+                        }
+                        className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
+                      />
+                      <span className="text-sm text-zinc-600">%</span>
+                    </div>
+                  </div>
+
+                  {/* Max Attainment */}
+                  <div className="w-32">
+                    <label className="text-xs font-medium text-zinc-600">Max Attainment</label>
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={accelerator.maxAttainment ?? ""}
+                        placeholder="∞"
+                        onChange={(e) =>
+                          updateAccelerator(index, { 
+                            maxAttainment: e.target.value ? parseFloat(e.target.value) : null 
+                          })
+                        }
+                        className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
+                      />
+                      <span className="text-sm text-zinc-600">%</span>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-400">Leave blank for no cap</p>
+                  </div>
+
+                  {/* Commission Rate */}
+                  <div className="w-32">
+                    <label className="text-xs font-medium text-zinc-600">Commission Rate</label>
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={(accelerator.commissionRate * 100).toFixed(2)}
+                        onChange={(e) =>
+                          updateAccelerator(index, { commissionRate: parseFloat(e.target.value) / 100 })
+                        }
+                        className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
+                      />
+                      <span className="text-sm text-zinc-600">%</span>
+                    </div>
+                  </div>
+
+                  {/* Remove */}
+                  <div className="flex items-end pb-1">
+                    <button
+                      type="button"
+                      onClick={() => removeAccelerator(index)}
                       className="text-sm text-red-600 hover:text-red-500"
                     >
                       Remove

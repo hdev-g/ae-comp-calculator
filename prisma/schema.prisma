@@ -101,13 +101,30 @@ model CommissionPlan {
   effectiveEndDate   DateTime?
   baseCommissionRate Decimal
 
-  bonusRules BonusRule[]
-  aeProfiles AEProfile[]
+  bonusRules              BonusRule[]
+  performanceAccelerators PerformanceAccelerator[]
+  aeProfiles              AEProfile[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([effectiveStartDate, effectiveEndDate])
+}
+
+model PerformanceAccelerator {
+  id               String  @id @default(cuid())
+  commissionPlanId String
+  
+  minAttainment    Decimal // e.g., 0 for 0%, 100.1 for 100.1%
+  maxAttainment    Decimal? // null means uncapped (e.g., 125.1%+)
+  commissionRate   Decimal // The rate at this tier (e.g., 0.10 for 10%)
+  
+  commissionPlan CommissionPlan @relation(fields: [commissionPlanId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([commissionPlanId])
 }
 
 model BonusRule {

@@ -13,7 +13,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   const plan = await prisma.commissionPlan.findUnique({
     where: { id },
-    include: { bonusRules: { orderBy: { name: "asc" } } },
+    include: { 
+      bonusRules: { orderBy: { name: "asc" } },
+      performanceAccelerators: { orderBy: { minAttainment: "asc" } },
+    },
   });
 
   if (!plan) {
@@ -49,6 +52,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   // Handle bonus rules: delete existing and recreate
   const bonusRules = Array.isArray(data.bonusRules) ? data.bonusRules : null;
+  const performanceAccelerators = Array.isArray(data.performanceAccelerators) ? data.performanceAccelerators : null;
 
   const plan = await prisma.$transaction(async (tx) => {
     if (bonusRules !== null) {
@@ -71,10 +75,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       });
     }
 
+    if (performanceAccelerators !== null) {
+      await tx.performanceAccelerator.deleteMany({ where: { commissionPlanId: id } });
+      await tx.performanceAccelerator.createMany({
+        data: performanceAccelerators
+          .filter((a): a is Record<string, unknown> => a && typeof a === "object")
+          .map((a) => ({
+            commissionPlanId: id,
+            minAttainment: typeof a.minAttainment === "number" ? a.minAttainment : 0,
+            maxAttainment: typeof a.maxAttainment === "number" ? a.maxAttainment : null,
+            commissionRate: typeof a.commissionRate === "number" ? a.commissionRate : 0,
+          })),
+      });
+    }
+
     return tx.commissionPlan.update({
       where: { id },
       data: updateData,
-      include: { bonusRules: { orderBy: { name: "asc" } } },
+      include: { 
+        bonusRules: { orderBy: { name: "asc" } },
+        performanceAccelerators: { orderBy: { minAttainment: "asc" } },
+      },
     });
   });
 

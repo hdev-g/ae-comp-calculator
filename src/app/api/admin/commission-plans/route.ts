@@ -16,6 +16,9 @@ export async function GET() {
       bonusRules: {
         orderBy: { name: "asc" },
       },
+      performanceAccelerators: {
+        orderBy: { minAttainment: "asc" },
+      },
     },
   });
 
@@ -47,6 +50,7 @@ export async function POST(req: Request) {
   }
 
   const bonusRules = Array.isArray(data.bonusRules) ? data.bonusRules : [];
+  const performanceAccelerators = Array.isArray(data.performanceAccelerators) ? data.performanceAccelerators : [];
 
   const plan = await prisma.commissionPlan.create({
     data: {
@@ -69,8 +73,17 @@ export async function POST(req: Request) {
             enabled: r.enabled !== false,
           })),
       },
+      performanceAccelerators: {
+        create: performanceAccelerators
+          .filter((a): a is Record<string, unknown> => a && typeof a === "object")
+          .map((a) => ({
+            minAttainment: typeof a.minAttainment === "number" ? a.minAttainment : 0,
+            maxAttainment: typeof a.maxAttainment === "number" ? a.maxAttainment : null,
+            commissionRate: typeof a.commissionRate === "number" ? a.commissionRate : 0,
+          })),
+      },
     },
-    include: { bonusRules: true },
+    include: { bonusRules: true, performanceAccelerators: true },
   });
 
   return NextResponse.json({ plan }, { status: 201 });
