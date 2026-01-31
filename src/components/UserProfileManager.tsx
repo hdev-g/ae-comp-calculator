@@ -14,6 +14,7 @@ type UserProfile = {
   territory: string | null;
   commissionPlanId: string | null;
   commissionPlan: CommissionPlanOption | null;
+  attioWorkspaceMemberId: string | null;
   user: {
     id: string;
     fullName: string | null;
@@ -34,6 +35,22 @@ function getInitials(name: string | null | undefined): string {
     return (parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "");
   }
   return name.slice(0, 2).toUpperCase();
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className={className}>
+      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className={className}>
+      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+    </svg>
+  );
 }
 
 export function UserProfileManager() {
@@ -116,20 +133,22 @@ export function UserProfileManager() {
         <table className="min-w-full text-left text-sm">
           <thead className="bg-zinc-50 text-xs text-zinc-600">
             <tr>
-              <th className="w-[280px] min-w-[280px] px-5 py-3 font-medium">User</th>
+              <th className="w-[260px] min-w-[260px] px-5 py-3 font-medium">User</th>
               <th className="px-3 py-3 font-medium">Role</th>
               <th className="px-3 py-3 font-medium">Segment</th>
               <th className="px-3 py-3 font-medium">Territory</th>
               <th className="px-3 py-3 font-medium">Commission Plan</th>
               <th className="px-3 py-3 font-medium">Access</th>
+              <th className="px-3 py-3 font-medium text-center">Attio</th>
             </tr>
           </thead>
           <tbody>
             {profiles.map((profile) => {
               const isAdmin = profile.user.role === "ADMIN";
+              const isAttioLinked = !!profile.attioWorkspaceMemberId;
               return (
                 <tr key={profile.id} className="border-t border-zinc-100">
-                  <td className="w-[280px] min-w-[280px] px-5 py-4">
+                  <td className="w-[260px] min-w-[260px] px-5 py-4">
                     <div className="flex items-center gap-3">
                       {profile.user.profileImageUrl ? (
                         <img
@@ -220,6 +239,22 @@ export function UserProfileManager() {
                       <option value="member">Member</option>
                       <option value="admin">Admin</option>
                     </select>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <div
+                      className={`inline-flex size-8 items-center justify-center rounded-lg border ${
+                        isAttioLinked
+                          ? "border-green-200 bg-green-50 text-green-600"
+                          : "border-zinc-200 bg-zinc-50 text-zinc-400"
+                      }`}
+                      title={isAttioLinked ? "Synced with Attio" : "Not synced with Attio"}
+                    >
+                      {isAttioLinked ? (
+                        <CheckIcon className="size-5" />
+                      ) : (
+                        <XIcon className="size-5" />
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
