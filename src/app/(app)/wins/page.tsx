@@ -27,7 +27,7 @@ function decimalToNumber(v: unknown): number {
 
 function formatCurrency(v: unknown) {
   const n = decimalToNumber(v);
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return Math.ceil(n).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function formatDate(d: Date) {

@@ -14,11 +14,11 @@ import { authOptions } from "@/server/auth";
 import { prisma } from "@/server/db";
 
 function formatCurrency(n: number) {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return Math.ceil(n).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function formatPercent(n: number) {
-  return `${(n * 100).toFixed(2)}%`;
+  return `${(n * 100).toFixed(1)}%`;
 }
 
 type DashboardView = "ytd" | "qtd" | "prevq";
@@ -451,14 +451,14 @@ export default async function DashboardPage(props: {
                 </div>
               </div>
 
-              {/* Cards Container - equal height */}
+              {/* Cards Container - equal height, fixed widths */}
               <div className="hidden sm:flex items-stretch gap-4">
                 {/* Commission Plan Card */}
-                <div className="rounded-xl border border-zinc-200 bg-white px-5 py-3">
+                <div className="w-56 rounded-xl border border-zinc-200 bg-white px-5 py-3">
                   <div className="text-xs text-zinc-500">Commission Plan</div>
                   {aeCommissionPlan ? (
                     <>
-                      <div className="mt-1 font-medium text-zinc-900">{aeCommissionPlan.name}</div>
+                      <div className="mt-1 font-medium text-zinc-900 truncate">{aeCommissionPlan.name}</div>
                       <div className="mt-0.5 text-sm text-zinc-500">
                         Base rate: {formatPercent(baseRate)}
                       </div>
@@ -479,12 +479,12 @@ export default async function DashboardPage(props: {
                 </div>
 
                 {/* Target Card */}
-                <div className="rounded-xl border border-zinc-200 bg-white px-5 py-3">
+                <div className="w-52 rounded-xl border border-zinc-200 bg-white px-5 py-3">
                   <div className="text-xs text-zinc-500">{targetInfo.label}</div>
                   {aeAnnualTarget > 0 ? (
                     <>
                       <div className="mt-1 font-medium text-zinc-900">{formatCurrency(targetInfo.target)}</div>
-                      <div className="mt-0.5 text-sm text-zinc-500">
+                      <div className="mt-0.5 text-sm text-zinc-500 truncate">
                         Annual: {formatCurrency(targetInfo.adjustedAnnualTarget)}
                         {targetInfo.adjustedAnnualTarget < aeAnnualTarget && (
                           <span className="text-zinc-400"> (ramp)</span>
