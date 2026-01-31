@@ -15,13 +15,15 @@ type UserProfile = {
   commissionPlanId: string | null;
   commissionPlan: CommissionPlanOption | null;
   user: {
+    id: string;
     fullName: string | null;
     email: string;
     profileImageUrl: string | null;
+    role: "AE" | "ADMIN";
   };
 };
 
-const JOB_ROLES = ["Account Executive", "Account Manager"];
+const JOB_ROLES = ["Account Executive", "Account Manager", "Revenue Operations"];
 const SEGMENTS = ["Mid-Market", "Enterprise", "SMB", "Strategic"];
 const TERRITORIES = ["North America", "EMEA", "APAC", "LATAM"];
 
@@ -67,8 +69,8 @@ export function UserProfileManager() {
 
   async function handleUpdate(
     id: string, 
-    field: "jobRole" | "segment" | "territory" | "commissionPlanId", 
-    value: string
+    field: "jobRole" | "segment" | "territory" | "commissionPlanId" | "isAdmin", 
+    value: string | boolean
   ) {
     setSaving(id);
     try {
@@ -119,94 +121,121 @@ export function UserProfileManager() {
               <th className="px-5 py-3 font-medium">Segment</th>
               <th className="px-5 py-3 font-medium">Territory</th>
               <th className="px-5 py-3 font-medium">Commission Plan</th>
+              <th className="px-5 py-3 font-medium text-center">Admin</th>
             </tr>
           </thead>
           <tbody>
-            {profiles.map((profile) => (
-              <tr key={profile.id} className="border-t border-zinc-100">
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    {profile.user.profileImageUrl ? (
-                      <img
-                        src={profile.user.profileImageUrl}
-                        alt={profile.user.fullName ?? profile.user.email}
-                        className="size-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-10 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-600">
-                        {getInitials(profile.user.fullName)}
+            {profiles.map((profile) => {
+              const isAdmin = profile.user.role === "ADMIN";
+              return (
+                <tr key={profile.id} className="border-t border-zinc-100">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      {profile.user.profileImageUrl ? (
+                        <img
+                          src={profile.user.profileImageUrl}
+                          alt={profile.user.fullName ?? profile.user.email}
+                          className="size-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex size-10 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-600">
+                          {getInitials(profile.user.fullName)}
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-medium text-zinc-950">
+                          {profile.user.fullName ?? "—"}
+                        </div>
+                        <div className="text-xs text-zinc-500">{profile.user.email}</div>
                       </div>
-                    )}
-                    <div>
-                      <div className="font-medium text-zinc-950">
-                        {profile.user.fullName ?? "—"}
-                      </div>
-                      <div className="text-xs text-zinc-500">{profile.user.email}</div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-5 py-4">
-                  <select
-                    value={profile.jobRole ?? ""}
-                    onChange={(e) => handleUpdate(profile.id, "jobRole", e.target.value)}
-                    disabled={saving === profile.id}
-                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
-                  >
-                    <option value="">Not set</option>
-                    {JOB_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-5 py-4">
-                  <select
-                    value={profile.segment ?? ""}
-                    onChange={(e) => handleUpdate(profile.id, "segment", e.target.value)}
-                    disabled={saving === profile.id}
-                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
-                  >
-                    <option value="">Not set</option>
-                    {SEGMENTS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-5 py-4">
-                  <select
-                    value={profile.territory ?? ""}
-                    onChange={(e) => handleUpdate(profile.id, "territory", e.target.value)}
-                    disabled={saving === profile.id}
-                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
-                  >
-                    <option value="">Not set</option>
-                    {TERRITORIES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-5 py-4">
-                  <select
-                    value={profile.commissionPlanId ?? ""}
-                    onChange={(e) => handleUpdate(profile.id, "commissionPlanId", e.target.value)}
-                    disabled={saving === profile.id}
-                    className="h-9 min-w-[180px] rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
-                  >
-                    <option value="">Not assigned</option>
-                    {commissionPlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-5 py-4">
+                    <select
+                      value={profile.jobRole ?? ""}
+                      onChange={(e) => handleUpdate(profile.id, "jobRole", e.target.value)}
+                      disabled={saving === profile.id}
+                      className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
+                    >
+                      <option value="">Not set</option>
+                      {JOB_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-5 py-4">
+                    <select
+                      value={profile.segment ?? ""}
+                      onChange={(e) => handleUpdate(profile.id, "segment", e.target.value)}
+                      disabled={saving === profile.id}
+                      className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
+                    >
+                      <option value="">Not set</option>
+                      {SEGMENTS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-5 py-4">
+                    <select
+                      value={profile.territory ?? ""}
+                      onChange={(e) => handleUpdate(profile.id, "territory", e.target.value)}
+                      disabled={saving === profile.id}
+                      className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
+                    >
+                      <option value="">Not set</option>
+                      {TERRITORIES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-5 py-4">
+                    <select
+                      value={profile.commissionPlanId ?? ""}
+                      onChange={(e) => handleUpdate(profile.id, "commissionPlanId", e.target.value)}
+                      disabled={saving === profile.id}
+                      className="h-9 min-w-[180px] rounded-lg border border-zinc-200 bg-white px-3 text-sm disabled:opacity-50"
+                    >
+                      <option value="">Not assigned</option>
+                      {commissionPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-5 py-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdate(profile.id, "isAdmin", !isAdmin)}
+                      disabled={saving === profile.id}
+                      className={`inline-flex size-8 items-center justify-center rounded-lg border transition-colors disabled:opacity-50 ${
+                        isAdmin
+                          ? "border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          : "border-zinc-200 bg-white text-zinc-400 hover:bg-zinc-50"
+                      }`}
+                      title={isAdmin ? "Remove admin access" : "Grant admin access"}
+                    >
+                      {isAdmin ? (
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="size-5">
+                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="size-5">
+                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                        </svg>
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
