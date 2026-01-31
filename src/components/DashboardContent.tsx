@@ -187,7 +187,7 @@ export function DashboardContent({
           <div className="flex flex-col gap-1">
             <div className="text-sm font-medium">Closed Won Deals</div>
             <div className="text-xs text-zinc-500">
-              Toggle bonuses for each deal • Base rate: {formatPercent(baseRate)}
+              Deal accelerators synced from Attio • Base rate: {formatPercent(baseRate)}
             </div>
           </div>
 
