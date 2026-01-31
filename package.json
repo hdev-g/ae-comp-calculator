@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "postinstall": "node ./scripts/prisma-generate-if-env.mjs",
-    "build": "next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
