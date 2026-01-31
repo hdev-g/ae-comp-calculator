@@ -49,6 +49,24 @@ function getInitials(name: string | null | undefined): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+function getTerritoryColors(territory: string): string {
+  const t = territory.toLowerCase();
+  if (t.includes("north america") || t === "na") {
+    return "bg-emerald-50 text-emerald-700";
+  }
+  if (t === "emea" || t.includes("europe")) {
+    return "bg-violet-50 text-violet-700";
+  }
+  if (t === "apac" || t.includes("asia") || t.includes("pacific")) {
+    return "bg-amber-50 text-amber-700";
+  }
+  if (t === "latam" || t.includes("latin")) {
+    return "bg-rose-50 text-rose-700";
+  }
+  // Default fallback
+  return "bg-zinc-100 text-zinc-700";
+}
+
 export default async function DashboardPage(props: {
   searchParams?: Promise<{ view?: string; ae?: string }>;
 }) {
@@ -242,7 +260,9 @@ export default async function DashboardPage(props: {
                     <span className="mt-1 text-sm text-zinc-400">No segment set</span>
                   )}
                   {aeTerritory ? (
-                    <span className="mt-1 text-sm text-zinc-500">{aeTerritory}</span>
+                    <span className={`mt-1 inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getTerritoryColors(aeTerritory)}`}>
+                      {aeTerritory}
+                    </span>
                   ) : (
                     <span className="mt-1 text-sm text-zinc-400">No territory set</span>
                   )}
