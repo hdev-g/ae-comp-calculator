@@ -129,19 +129,13 @@ function calculateEffectiveTarget(params: {
   }
   
   if (view === "ytd") {
-    // Sum of all quarters from start quarter to current quarter
-    let ytdTarget = 0;
-    const effectiveStartQ = startedThisYear && startQuarter ? startQuarter : 1;
-    for (let q = effectiveStartQ; q <= currentQuarter; q++) {
-      const isRampQ = startedThisYear && startQuarter === q;
-      ytdTarget += isRampQ ? quarterlyTarget * 0.5 : quarterlyTarget;
-    }
-    const hasRamp = startedThisYear && startQuarter !== null && startQuarter <= currentQuarter;
+    // YTD variance should be against the full adjusted annual target
+    const hasRamp = startedThisYear && startQuarter !== null;
     return { 
-      target: ytdTarget, 
+      target: adjustedAnnualTarget, 
       adjustedAnnualTarget,
       isRampQuarter: hasRamp, 
-      label: hasRamp ? "YTD Target (incl. ramp)" : "YTD Target"
+      label: hasRamp ? "Annual Target (ramp adjusted)" : "Annual Target"
     };
   }
   
