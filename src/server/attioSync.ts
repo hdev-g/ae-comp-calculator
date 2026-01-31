@@ -133,7 +133,11 @@ async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | nul
     const raw = asRecord(deal.raw);
     const values = asRecord(raw?.values) ?? asRecord(raw?.attributes) ?? raw;
     
-    const appliedRuleIds = new Set(dbDeal.appliedBonusRuleIds);
+    // appliedBonusRuleIds is stored as JSON array of strings
+    const existingRuleIds = Array.isArray(dbDeal.appliedBonusRuleIds) 
+      ? (dbDeal.appliedBonusRuleIds as string[]) 
+      : [];
+    const appliedRuleIds = new Set<string>(existingRuleIds);
 
     for (const [attrId, ruleIds] of attrToRules.entries()) {
       // Check if attribute value is truthy (checkbox checked)
@@ -152,8 +156,8 @@ async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | nul
 
     // Update the deal if appliedBonusRuleIds changed
     const newAppliedRuleIds = Array.from(appliedRuleIds);
-    if (newAppliedRuleIds.length !== dbDeal.appliedBonusRuleIds.length ||
-        !newAppliedRuleIds.every(id => dbDeal.appliedBonusRuleIds.includes(id))) {
+    if (newAppliedRuleIds.length !== existingRuleIds.length ||
+        !newAppliedRuleIds.every(id => existingRuleIds.includes(id))) {
       await prisma.deal.update({
         where: { id: dbDeal.id },
         data: { appliedBonusRuleIds: newAppliedRuleIds },
