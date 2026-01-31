@@ -223,8 +223,8 @@ export function DashboardContent({
                     <div className="text-[10px] font-normal text-zinc-400">+{formatPercent(rule.rateAdd)}</div>
                   </th>
                 ))}
-                <th className="px-5 py-3 font-medium text-right">Rate</th>
-                <th className="px-5 py-3 font-medium text-right">Commission</th>
+                <th className="w-20 px-5 py-3 font-medium text-right">Rate</th>
+                <th className="w-32 px-5 py-3 font-medium text-right">Commission</th>
               </tr>
             </thead>
             <tbody>
@@ -276,10 +276,10 @@ export function DashboardContent({
                             </td>
                           );
                         })}
-                        <td className="px-5 py-4 text-right">
+                        <td className="w-20 px-5 py-4 text-right">
                           <div className="font-medium text-zinc-900">{formatPercent(totalRate)}</div>
                         </td>
-                        <td className="px-5 py-4 text-right font-medium text-zinc-950">
+                        <td className="w-32 px-5 py-4 text-right font-medium text-zinc-950">
                           {formatCurrency(commission)}
                         </td>
                       </tr>
@@ -293,8 +293,8 @@ export function DashboardContent({
                     {bonusRules.map((rule) => (
                       <td key={rule.id} className="px-3 py-4"></td>
                     ))}
-                    <td className="px-5 py-4"></td>
-                    <td className="px-5 py-4 text-right text-zinc-950">{formatCurrency(totals.commission)}</td>
+                    <td className="w-20 px-5 py-4"></td>
+                    <td className="w-32 px-5 py-4 text-right text-zinc-950">{formatCurrency(totals.commission)}</td>
                   </tr>
                 </>
               )}
