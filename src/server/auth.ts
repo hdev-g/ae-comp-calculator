@@ -88,60 +88,60 @@ export const authOptions: NextAuthOptions = {
         select: { id: true, role: true },
       });
 
-      if (user.role === "AE") {
-        await prisma.aEProfile.upsert({
-          where: { userId: user.id },
-          update: { status: "ACTIVE" },
-          create: { userId: user.id, status: "ACTIVE" },
-          select: { id: true },
-        });
+      // Create AEProfile for all users (regardless of admin status)
+      // This ensures everyone appears in the Users admin page
+      await prisma.aEProfile.upsert({
+        where: { userId: user.id },
+        update: { status: "ACTIVE" },
+        create: { userId: user.id, status: "ACTIVE" },
+        select: { id: true },
+      });
 
-        // Best-effort Attio linkage by email:
-        // 1) Prefer existing synced member in our DB (fast, no Attio API dependency)
-        // 2) Fall back to Attio API lookup if ATTIO_API_KEY is set
-        try {
-          let memberId: string | null =
-            (
-              await prisma.attioWorkspaceMember.findUnique({
-                where: { email },
-                select: { id: true },
-              })
-            )?.id ?? null;
+      // Best-effort Attio linkage by email:
+      // 1) Prefer existing synced member in our DB (fast, no Attio API dependency)
+      // 2) Fall back to Attio API lookup if ATTIO_API_KEY is set
+      try {
+        let memberId: string | null =
+          (
+            await prisma.attioWorkspaceMember.findUnique({
+              where: { email },
+              select: { id: true },
+            })
+          )?.id ?? null;
 
-          if (!memberId && process.env.ATTIO_API_KEY) {
-            const member = await findWorkspaceMemberByEmail(email);
-            if (member?.id) {
-              memberId = member.id;
-              // Persist a minimal member row so Settings can display "Connected".
-              await prisma.attioWorkspaceMember.upsert({
-                where: { id: member.id },
-                update: { email, fullName: member.name ?? null },
-                create: { id: member.id, email, fullName: member.name ?? null },
-                select: { id: true },
-              });
-            }
+        if (!memberId && process.env.ATTIO_API_KEY) {
+          const member = await findWorkspaceMemberByEmail(email);
+          if (member?.id) {
+            memberId = member.id;
+            // Persist a minimal member row so Settings can display "Connected".
+            await prisma.attioWorkspaceMember.upsert({
+              where: { id: member.id },
+              update: { email, fullName: member.name ?? null },
+              create: { id: member.id, email, fullName: member.name ?? null },
+              select: { id: true },
+            });
           }
-
-          if (memberId) {
-            try {
-              await prisma.aEProfile.update({
-                where: { userId: user.id },
-                data: { attioWorkspaceMemberId: memberId },
-              });
-            } catch (e) {
-              // Likely unique constraint conflict (same Attio member linked to another AEProfile).
-              console.warn("[auth] Attio member auto-link skipped:", e);
-              memberId = null;
-            }
-          }
-
-          // If we linked successfully, assign deals immediately so "My dashboard" works right after login.
-          if (memberId) {
-            await reconcileDealsToAEs({ onlyMemberId: memberId });
-          }
-        } catch (e) {
-          console.warn("[auth] Attio member auto-link failed:", e);
         }
+
+        if (memberId) {
+          try {
+            await prisma.aEProfile.update({
+              where: { userId: user.id },
+              data: { attioWorkspaceMemberId: memberId },
+            });
+          } catch (e) {
+            // Likely unique constraint conflict (same Attio member linked to another AEProfile).
+            console.warn("[auth] Attio member auto-link skipped:", e);
+            memberId = null;
+          }
+        }
+
+        // If we linked successfully, assign deals immediately so "My dashboard" works right after login.
+        if (memberId) {
+          await reconcileDealsToAEs({ onlyMemberId: memberId });
+        }
+      } catch (e) {
+        console.warn("[auth] Attio member auto-link failed:", e);
       }
 
       return true;
