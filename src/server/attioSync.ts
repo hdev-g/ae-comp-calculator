@@ -148,9 +148,12 @@ async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | nul
         if (eligibleRuleIds.length > 0 && !eligibleRuleIds.includes(ruleId)) continue;
         
         if (attrValue === true) {
+          // Attio attribute is checked - apply the rule
           appliedRuleIds.add(ruleId);
+        } else {
+          // Attio attribute is unchecked - remove the rule (Attio is the source of truth)
+          appliedRuleIds.delete(ruleId);
         }
-        // Note: We don't remove rules if attr is false, since they could be manually applied
       }
     }
 
