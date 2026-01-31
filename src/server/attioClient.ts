@@ -61,34 +61,16 @@ function getDealsInclude(): string[] {
 }
 
 function getWonFilter(): Record<string, unknown> | null {
-  // Best-effort: Attio filters are workspace-specific. If you provide IDs, we can filter server-side.
-  // You can copy these ids from a record payload:
-  // - stage status: data.values.stage[0].status.id.status_id
-  // - deal_forecast option: data.values.deal_forecast[0].option.id.option_id
-  const stageStatusId = process.env.ATTIO_WON_STAGE_STATUS_ID?.trim();
+  // Attio filter syntax for select attributes: { "attribute_slug": "option_id" }
+  // You can find the option_id in a Won deal's payload:
+  //   data.values.deal_forecast[0].option.id.option_id
   const forecastOptionId = process.env.ATTIO_WON_FORECAST_OPTION_ID?.trim();
 
-  const clauses: Record<string, unknown>[] = [];
-
-  if (stageStatusId) {
-    clauses.push({
-      path: [["stage"]],
-      constraints: { status_id: stageStatusId },
-    });
-  }
-
   if (forecastOptionId) {
-    clauses.push({
-      path: [["deal_forecast"]],
-      constraints: { option_id: forecastOptionId },
-    });
+    return { deal_forecast: forecastOptionId };
   }
 
-  if (clauses.length === 0) return null;
-  if (clauses.length === 1) return clauses[0]!;
-
-  // Combine if both are provided.
-  return { operator: "and", clauses };
+  return null;
 }
 
 async function attioFetch(path: string, init?: RequestInit) {
@@ -368,76 +350,46 @@ export function parseDealRecord(raw: unknown): AttioDealParsed | null {
 export async function listDealsRaw(): Promise<unknown[]> {
   const path = getDealsPath();
 
-  // If this is a query-style endpoint, use POST and attempt basic pagination.
+  // If this is a query-style endpoint, use POST with offset-based pagination.
   if (path.endsWith("/query")) {
     const all: unknown[] = [];
-    let cursor: string | null = null;
     const include = getDealsInclude();
     const wonFilter = getWonFilter();
-
     const onlyWon = (process.env.ATTIO_DEALS_ONLY_WON ?? "true").toLowerCase() !== "false";
-    let didFallbackToUnfiltered = false;
 
-    for (let i = 0; i < 50; i++) {
-      const body: Record<string, unknown> = { limit: 200, include };
-      if (cursor) body["cursor"] = cursor;
+    const pageSize = 200;
+    let offset = 0;
+    const maxPages = 100; // Safety limit: 100 pages × 200 = 20,000 deals max
+
+    for (let page = 0; page < maxPages; page++) {
+      const body: Record<string, unknown> = { limit: pageSize, offset, include };
       if (onlyWon && wonFilter) body["filter"] = wonFilter;
 
       let data: unknown;
       try {
         data = await attioFetch(path, { method: "POST", body: JSON.stringify(body) });
       } catch (e) {
-        // If Attio rejects our filter shape, fall back to unfiltered query so sync still works.
+        // If Attio rejects our filter, fall back to unfiltered query.
         const msg = e instanceof Error ? e.message : "";
         const isBadRequest = msg.includes("Attio API error 400") || msg.includes("Attio API error 422");
         if (onlyWon && wonFilter && isBadRequest) {
           console.warn("[attio] deals query filter rejected; falling back to unfiltered query");
-          const fallbackBody: Record<string, unknown> = { limit: 200, include };
-          if (cursor) fallbackBody["cursor"] = cursor;
+          const fallbackBody: Record<string, unknown> = { limit: pageSize, offset, include };
           data = await attioFetch(path, { method: "POST", body: JSON.stringify(fallbackBody) });
         } else {
           throw e;
         }
       }
-      const batch = getDealsArray(data);
-      // Heuristic fallback: if the filter "works" but returns an unexpectedly tiny first page,
-      // it likely means our filter constraints don't match your workspace schema.
-      // In that case, fall back to an unfiltered query and let the app-side "won" parsing decide.
-      if (!didFallbackToUnfiltered && i === 0 && cursor === null && onlyWon && wonFilter && batch.length > 0 && batch.length < 50) {
-        console.warn(
-          `[attio] deals query filter returned only ${batch.length} records on first page; falling back to unfiltered query`,
-        );
-        didFallbackToUnfiltered = true;
-        all.length = 0;
-        cursor = null;
-        const fallbackBody: Record<string, unknown> = { limit: 200, include };
-        data = await attioFetch(path, { method: "POST", body: JSON.stringify(fallbackBody) });
-        const fallbackBatch = getDealsArray(data);
-        all.push(...fallbackBatch);
 
-        const rec0 = asRecord(data);
-        const next0 =
-          getString(rec0?.["next_cursor"]) ??
-          getString(rec0?.["nextCursor"]) ??
-          getString(asRecord(rec0?.["data"])?.["next_cursor"]) ??
-          getString(asRecord(rec0?.["data"])?.["nextCursor"]) ??
-          null;
-        if (!next0) break;
-        cursor = next0;
-        continue;
-      }
+      const batch = getDealsArray(data);
       all.push(...batch);
 
-      const rec = asRecord(data);
-      const next =
-        getString(rec?.["next_cursor"]) ??
-        getString(rec?.["nextCursor"]) ??
-        getString(asRecord(rec?.["data"])?.["next_cursor"]) ??
-        getString(asRecord(rec?.["data"])?.["nextCursor"]) ??
-        null;
+      console.log(`[attio] fetched page ${page + 1}: offset=${offset}, got ${batch.length} deals, total so far: ${all.length}`);
 
-      if (!next) break;
-      cursor = next;
+      // If we got fewer than pageSize, we've reached the end.
+      if (batch.length < pageSize) break;
+
+      offset += pageSize;
     }
 
     return all;

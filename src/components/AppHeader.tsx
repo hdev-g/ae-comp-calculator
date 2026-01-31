@@ -19,10 +19,8 @@ function PanelIcon(props: { className?: string }) {
 }
 
 function getTitle(pathname: string) {
-  if (pathname === "/") return "Home";
-  if (pathname.startsWith("/dashboard")) return "My dashboard";
+  if (pathname === "/") return "Dashboard";
   if (pathname.startsWith("/wins")) return "Wins";
-  if (pathname.startsWith("/deals")) return "Wins";
   if (pathname.startsWith("/settings")) return "Account settings";
   if (pathname.startsWith("/admin")) return "Admin";
   return "AE Comp";

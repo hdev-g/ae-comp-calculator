@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -41,12 +42,13 @@ function ExpandSidebarIcon(props: { className?: string }) {
 type NavItem = {
   href: string;
   label: string;
+  adminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Home" },
-  { href: "/dashboard", label: "My dashboard" },
+  { href: "/", label: "Dashboard" },
   { href: "/wins", label: "Wins" },
+  { href: "/admin", label: "Admin", adminOnly: true },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -55,6 +57,8 @@ function cx(...classes: Array<string | false | null | undefined>) {
 
 export function SidebarNav(props: { onToggleCollapsed: () => void }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuWrapRef = useRef<HTMLDivElement | null>(null);
@@ -115,14 +119,17 @@ export function SidebarNav(props: { onToggleCollapsed: () => void }) {
                   Account settings
                 </Link>
                 <div className="h-px bg-zinc-200" />
-                <a
-                  href="/api/auth/signout?callbackUrl=/login"
+                <button
+                  type="button"
                   role="menuitem"
-                  className="block px-3 py-2 text-[14px] leading-5 text-zinc-900 hover:bg-zinc-50"
-                  onClick={() => setMenuOpen(false)}
+                  className="block w-full px-3 py-2 text-left text-[14px] leading-5 text-zinc-900 hover:bg-zinc-50"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void signOut({ callbackUrl: "/login" });
+                  }}
                 >
                   Sign out
-                </a>
+                </button>
               </div>
             ) : null}
           </div>
@@ -142,22 +149,23 @@ export function SidebarNav(props: { onToggleCollapsed: () => void }) {
       </div>
 
       <div className="flex flex-1 flex-col gap-1 bg-white p-4">
-        {navItems.map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cx(
-                "rounded-md px-3 py-2 text-[14px] leading-5 font-medium transition-colors",
-                active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100",
-              )}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-        <div className="mt-auto px-3 py-2 text-xs text-zinc-500">Local preview</div>
+        {navItems
+          .filter((item) => !item.adminOnly || isAdmin)
+          .map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cx(
+                  "rounded-md px-3 py-2 text-[14px] leading-5 font-medium transition-colors",
+                  active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100",
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
       </div>
 
     </nav>

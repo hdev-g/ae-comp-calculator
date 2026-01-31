@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth";
 import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
 import { prisma } from "@/server/db";
+import type { Prisma } from "@/generated/prisma";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
       action: "AE_ATTIO_LINKED",
       entityType: "AEProfile",
       entityId: ae.id,
-      detailsJson: { attioWorkspaceMemberId: workspaceMemberId, dealsAssigned: reconcile.dealsUpdated } as any,
+      detailsJson: { attioWorkspaceMemberId: workspaceMemberId, dealsAssigned: reconcile.dealsUpdated } satisfies Prisma.InputJsonValue,
     },
   });
 

@@ -2,6 +2,7 @@ import { listDealsRaw, listWorkspaceMembersRaw, parseDealRecord } from "@/server
 import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
 import { reconcileUsersToAttioByEmail } from "@/server/userAttioLinking";
 import { prisma } from "@/server/db";
+import type { Prisma } from "@/generated/prisma";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
@@ -54,19 +55,24 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
 
   const memberUpserts = await Promise.all(
     membersRaw.map(async (raw) => {
-      const rec = raw as Record<string, any>;
+      const rec = (asRecord(raw) ?? {}) as Record<string, unknown>;
       const id = extractWorkspaceMemberId(raw);
       if (!id) return null;
       const email =
-        pickString(rec?.email, rec?.email_address, rec?.attributes?.email, rec?.user?.email)?.toLowerCase() ?? null;
+        pickString(
+          rec["email"],
+          rec["email_address"],
+          asRecord(rec["attributes"])?.["email"],
+          asRecord(rec["user"])?.["email"],
+        )?.toLowerCase() ?? null;
       const fullName =
         pickString(
-          rec?.name,
-          rec?.full_name,
-          rec?.fullName,
-          [pickString(rec?.first_name), pickString(rec?.last_name)].filter(Boolean).join(" ").trim(),
+          rec["name"],
+          rec["full_name"],
+          rec["fullName"],
+          [pickString(rec["first_name"]), pickString(rec["last_name"])].filter(Boolean).join(" ").trim(),
         ) ?? null;
-      const status = pickString(rec?.access_level, rec?.status) ?? null;
+      const status = pickString(rec["access_level"], rec["status"]) ?? null;
 
       // Repair/migrate: if we previously stored a bad primary key (e.g. "[object Object]") for the same email,
       // we need to replace that row so future link-by-email yields a valid id.
@@ -86,7 +92,7 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
             await tx.attioWorkspaceMember.delete({ where: { id: existingByEmail.id } });
 
             await tx.attioWorkspaceMember.create({
-              data: { id, email, fullName, status, rawAttioPayload: raw as any },
+              data: { id, email, fullName, status, rawAttioPayload: raw as Prisma.InputJsonValue },
               select: { id: true },
             });
             return { id };
@@ -96,8 +102,8 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
 
       return prisma.attioWorkspaceMember.upsert({
         where: { id },
-        update: { email, fullName, status, rawAttioPayload: raw as any },
-        create: { id, email, fullName, status, rawAttioPayload: raw as any },
+        update: { email, fullName, status, rawAttioPayload: raw as Prisma.InputJsonValue },
+        create: { id, email, fullName, status, rawAttioPayload: raw as Prisma.InputJsonValue },
         select: { id: true },
       });
     }),
@@ -121,7 +127,7 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
           closeDate: new Date(d!.closeDate),
           status: d!.status,
           attioOwnerWorkspaceMemberId: d!.ownerWorkspaceMemberId ?? null,
-          rawAttioPayload: d!.raw as any,
+          rawAttioPayload: d!.raw as Prisma.InputJsonValue,
         },
         create: {
           attioRecordId: d!.attioRecordId,
@@ -132,7 +138,7 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
           closeDate: new Date(d!.closeDate),
           status: d!.status,
           attioOwnerWorkspaceMemberId: d!.ownerWorkspaceMemberId ?? null,
-          rawAttioPayload: d!.raw as any,
+          rawAttioPayload: d!.raw as Prisma.InputJsonValue,
         },
         select: { id: true },
       }),
@@ -174,11 +180,11 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
       action: "ATTIO_SYNC",
       entityType: "Attio",
       entityId: "workspace",
-      detailsJson: {
+      detailsJson: ({
         ...result,
         startedAt: startedAt.toISOString(),
         finishedAt: new Date().toISOString(),
-      } as any,
+      } satisfies Prisma.InputJsonValue),
     },
   });
 

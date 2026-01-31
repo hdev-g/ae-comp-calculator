@@ -2,6 +2,7 @@ import type { NextAuthOptions, Profile } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 
+import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
 import { prisma } from "@/server/db";
 import { findWorkspaceMemberByEmail } from "@/server/attioClient";
 import { getAllowedEmailDomains, getSeedAdminEmails } from "@/server/env";
@@ -34,6 +35,12 @@ function getProfileName(profile: Profile): string | null {
   return full ? full : null;
 }
 
+function getProfilePicture(profile: Profile): string | null {
+  const rec = profile as unknown as Record<string, unknown>;
+  const picture = rec["picture"];
+  return typeof picture === "string" && picture.startsWith("http") ? picture : null;
+}
+
 export const authOptions: NextAuthOptions = {
   // NextAuth v4 expects NEXTAUTH_SECRET; allow AUTH_SECRET for convenience.
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
@@ -59,11 +66,14 @@ export const authOptions: NextAuthOptions = {
 
       const role = isSeedAdmin(email) ? "ADMIN" : "AE";
 
+      const profilePicture = profile ? getProfilePicture(profile) : null;
+
       const user = await prisma.user.upsert({
         where: { googleSub },
         update: {
           email,
           fullName: profile ? getProfileName(profile) : null,
+          profileImageUrl: profilePicture,
           role,
           status: "ACTIVE",
         },
@@ -71,6 +81,7 @@ export const authOptions: NextAuthOptions = {
           email,
           googleSub,
           fullName: profile ? getProfileName(profile) : null,
+          profileImageUrl: profilePicture,
           role,
           status: "ACTIVE",
         },
@@ -85,19 +96,51 @@ export const authOptions: NextAuthOptions = {
           select: { id: true },
         });
 
-        // Best-effort Attio linkage (skip if no ATTIO_API_KEY)
-        if (process.env.ATTIO_API_KEY) {
-          try {
+        // Best-effort Attio linkage by email:
+        // 1) Prefer existing synced member in our DB (fast, no Attio API dependency)
+        // 2) Fall back to Attio API lookup if ATTIO_API_KEY is set
+        try {
+          let memberId: string | null =
+            (
+              await prisma.attioWorkspaceMember.findUnique({
+                where: { email },
+                select: { id: true },
+              })
+            )?.id ?? null;
+
+          if (!memberId && process.env.ATTIO_API_KEY) {
             const member = await findWorkspaceMemberByEmail(email);
             if (member?.id) {
-              await prisma.aEProfile.update({
-                where: { userId: user.id },
-                data: { attioWorkspaceMemberId: member.id },
+              memberId = member.id;
+              // Persist a minimal member row so Settings can display "Connected".
+              await prisma.attioWorkspaceMember.upsert({
+                where: { id: member.id },
+                update: { email, fullName: member.name ?? null },
+                create: { id: member.id, email, fullName: member.name ?? null },
+                select: { id: true },
               });
             }
-          } catch (e) {
-            console.warn("[auth] Attio member auto-link failed:", e);
           }
+
+          if (memberId) {
+            try {
+              await prisma.aEProfile.update({
+                where: { userId: user.id },
+                data: { attioWorkspaceMemberId: memberId },
+              });
+            } catch (e) {
+              // Likely unique constraint conflict (same Attio member linked to another AEProfile).
+              console.warn("[auth] Attio member auto-link skipped:", e);
+              memberId = null;
+            }
+          }
+
+          // If we linked successfully, assign deals immediately so "My dashboard" works right after login.
+          if (memberId) {
+            await reconcileDealsToAEs({ onlyMemberId: memberId });
+          }
+        } catch (e) {
+          console.warn("[auth] Attio member auto-link failed:", e);
         }
       }
 

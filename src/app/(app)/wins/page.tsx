@@ -3,12 +3,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth";
 import { prisma } from "@/server/db";
 
+type DecimalLike = { toNumber: () => number };
+
+function isDecimalLike(v: unknown): v is DecimalLike {
+  return Boolean(v && typeof v === "object" && "toNumber" in v && typeof (v as DecimalLike).toNumber === "function");
+}
+
 function decimalToNumber(v: unknown): number {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
-  const anyV = v as any;
-  if (anyV && typeof anyV === "object" && typeof anyV.toNumber === "function") {
-    const n = anyV.toNumber();
+  if (isDecimalLike(v)) {
+    const n = v.toNumber();
     return typeof n === "number" && Number.isFinite(n) ? n : 0;
   }
   return 0;

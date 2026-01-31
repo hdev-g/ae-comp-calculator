@@ -4,17 +4,17 @@ export type CommissionPlan = {
   id: string;
   name: string;
   effectiveStartDate: string; // ISO date (date-only or datetime)
-  effectiveEndDate?: string; // ISO
+  effectiveEndDate?: string | null; // ISO
   baseCommissionRate: number; // e.g. 0.1
 };
-
-export type BonusRuleType = "multi_year" | "testimonial" | "marketing";
 
 export type BonusRule = {
   id: string;
   commissionPlanId: string;
-  type: BonusRuleType;
+  name: string;
   rateAdd: number; // e.g. 0.01
+  effectiveStartDate?: string | null; // ISO
+  effectiveEndDate?: string | null; // ISO
   enabled: boolean;
 };
 
@@ -35,7 +35,7 @@ export type Deal = {
 export type DealLineItem = {
   dealId: string;
   appliedBaseRate: number;
-  appliedBonusBreakdown: Array<{ type: BonusRuleType; rateAdd: number }>;
+  appliedBonusBreakdown: Array<{ name: string; rateAdd: number }>;
   appliedTotalRate: number;
   commissionableAmount: number;
   commissionAmount: number;
@@ -49,22 +49,41 @@ export type QuarterStatement = {
   lineItems: DealLineItem[];
 };
 
-export function isBonusRuleApplicable(deal: Deal, type: BonusRuleType): boolean {
-  if (type === "multi_year") {
-    const term = deal.termLengthMonths ?? null;
-    return Boolean(deal.isMultiYear) || (term !== null && term >= 24);
+/**
+ * Check if a bonus rule is active for a given deal close date.
+ * Rules without date constraints are always active.
+ */
+export function isBonusRuleActiveForDate(rule: BonusRule, closeDateISO: string): boolean {
+  if (!rule.enabled) return false;
+  
+  const closeDate = new Date(closeDateISO);
+  
+  // Check start date
+  if (rule.effectiveStartDate) {
+    const startDate = new Date(rule.effectiveStartDate);
+    if (closeDate < startDate) return false;
   }
-  if (type === "testimonial") return Boolean(deal.hasTestimonialCommitment);
-  if (type === "marketing") return Boolean(deal.hasMarketingCommitment);
-  return false;
+  
+  // Check end date
+  if (rule.effectiveEndDate) {
+    const endDate = new Date(rule.effectiveEndDate);
+    if (closeDate > endDate) return false;
+  }
+  
+  return true;
 }
 
 export function computeCommissionForDeal(deal: Deal, plan: CommissionPlan, bonusRules: BonusRule[]) {
   const appliedBaseRate = plan.baseCommissionRate;
+  
+  // Filter bonus rules that are:
+  // 1. Associated with this plan
+  // 2. Enabled
+  // 3. Active for the deal's close date
   const appliedBonusBreakdown = bonusRules
-    .filter((r) => r.enabled && r.commissionPlanId === plan.id)
-    .filter((r) => isBonusRuleApplicable(deal, r.type))
-    .map((r) => ({ type: r.type, rateAdd: r.rateAdd }));
+    .filter((r) => r.commissionPlanId === plan.id)
+    .filter((r) => isBonusRuleActiveForDate(r, deal.closeDate))
+    .map((r) => ({ name: r.name, rateAdd: r.rateAdd }));
 
   const appliedTotalRate =
     appliedBaseRate + appliedBonusBreakdown.reduce((sum, b) => sum + b.rateAdd, 0);
@@ -123,4 +142,3 @@ export function computeQuarterStatement(params: {
     lineItems,
   };
 }
-

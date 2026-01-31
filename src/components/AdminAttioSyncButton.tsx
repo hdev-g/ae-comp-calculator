@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+}
+
 export function AdminAttioSyncButton() {
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -11,10 +15,13 @@ export function AdminAttioSyncButton() {
     setMessage(null);
     try {
       const res = await fetch("/api/admin/attio/sync", { method: "POST" });
-      const data = (await res.json().catch(() => null)) as any;
-      if (!res.ok) throw new Error(data?.error ?? `Sync failed (${res.status})`);
+      const json = (await res.json().catch(() => null)) as unknown;
+      const data = asRecord(json);
+      if (!res.ok) throw new Error((data?.["error"] as string | undefined) ?? `Sync failed (${res.status})`);
       setStatus("done");
-      setMessage(`OK: members=${data?.membersFetched ?? "?"}, deals=${data?.dealsFetched ?? "?"}, parsed=${data?.dealsParsed ?? "?"}`);
+      setMessage(
+        `OK: members=${String(data?.["membersFetched"] ?? "?")}, deals=${String(data?.["dealsFetched"] ?? "?")}, parsed=${String(data?.["dealsParsed"] ?? "?")}`,
+      );
     } catch (e) {
       setStatus("error");
       setMessage(e instanceof Error ? e.message : "Sync failed");
