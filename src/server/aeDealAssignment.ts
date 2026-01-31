@@ -28,10 +28,14 @@ export async function reconcileDealsToAEs(params?: { onlyMemberId?: string }): P
   let dealsUpdated = 0;
 
   for (const [memberId, aeProfileId] of map.entries()) {
+    // Update all deals where owner matches but aeProfileId is different or null
     const res = await prisma.deal.updateMany({
       where: {
         attioOwnerWorkspaceMemberId: memberId,
-        NOT: { aeProfileId },
+        OR: [
+          { aeProfileId: null },
+          { aeProfileId: { not: aeProfileId } },
+        ],
       },
       data: { aeProfileId },
     });
