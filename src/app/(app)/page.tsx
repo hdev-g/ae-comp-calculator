@@ -67,6 +67,83 @@ function getTerritoryColors(territory: string): string {
   return "bg-zinc-100 text-zinc-700";
 }
 
+/**
+ * Calculate effective target based on view, annual target, and start date.
+ * - First quarter after start date = 50% of normal quarterly target
+ * - Full year target is adjusted if started mid-year
+ */
+function calculateEffectiveTarget(params: {
+  annualTarget: number;
+  startDate: Date | null;
+  view: DashboardView;
+  currentYear: number;
+  currentQuarter: number;
+}): { target: number; isRampQuarter: boolean; label: string } {
+  const { annualTarget, startDate, view, currentYear, currentQuarter } = params;
+  
+  if (annualTarget <= 0) {
+    return { target: 0, isRampQuarter: false, label: "No target set" };
+  }
+  
+  const quarterlyTarget = annualTarget / 4;
+  
+  // Determine which quarter they started in (if this year)
+  let startQuarter: number | null = null;
+  let startedThisYear = false;
+  
+  if (startDate) {
+    const startYear = startDate.getFullYear();
+    if (startYear === currentYear) {
+      startedThisYear = true;
+      const startMonth = startDate.getMonth();
+      startQuarter = Math.floor(startMonth / 3) + 1; // 1-4
+    }
+  }
+  
+  if (view === "qtd") {
+    // Current quarter target
+    const isRampQuarter = startedThisYear && startQuarter === currentQuarter;
+    const target = isRampQuarter ? quarterlyTarget * 0.5 : quarterlyTarget;
+    return { 
+      target, 
+      isRampQuarter, 
+      label: isRampQuarter ? `Q${currentQuarter} Target (Ramp)` : `Q${currentQuarter} Target`
+    };
+  }
+  
+  if (view === "ytd") {
+    // Sum of all quarters from Q1 to current quarter
+    let ytdTarget = 0;
+    for (let q = 1; q <= currentQuarter; q++) {
+      const isRampQ = startedThisYear && startQuarter === q;
+      ytdTarget += isRampQ ? quarterlyTarget * 0.5 : quarterlyTarget;
+    }
+    const hasRamp = startedThisYear && startQuarter !== null && startQuarter <= currentQuarter;
+    return { 
+      target: ytdTarget, 
+      isRampQuarter: hasRamp, 
+      label: hasRamp ? "YTD Target (incl. ramp)" : "YTD Target"
+    };
+  }
+  
+  if (view === "prevq") {
+    // Previous quarter target
+    const prevQ = currentQuarter === 1 ? 4 : currentQuarter - 1;
+    const prevYear = currentQuarter === 1 ? currentYear - 1 : currentYear;
+    const isRampQuarter = startDate && 
+      startDate.getFullYear() === prevYear && 
+      Math.floor(startDate.getMonth() / 3) + 1 === prevQ;
+    const target = isRampQuarter ? quarterlyTarget * 0.5 : quarterlyTarget;
+    return { 
+      target, 
+      isRampQuarter: !!isRampQuarter, 
+      label: isRampQuarter ? `Q${prevQ} Target (Ramp)` : `Q${prevQ} Target`
+    };
+  }
+  
+  return { target: annualTarget, isRampQuarter: false, label: "Annual Target" };
+}
+
 export default async function DashboardPage(props: {
   searchParams?: Promise<{ view?: string; ae?: string }>;
 }) {
@@ -97,7 +174,12 @@ export default async function DashboardPage(props: {
   const allAEs = isAdmin
     ? await prisma.aEProfile.findMany({
         where: { status: "ACTIVE" },
-        include: { 
+        select: {
+          id: true,
+          segment: true,
+          territory: true,
+          annualTarget: true,
+          startDate: true,
           user: { select: { fullName: true, email: true, profileImageUrl: true } },
           commissionPlan: { 
             select: { 
@@ -127,6 +209,8 @@ export default async function DashboardPage(props: {
     id: string;
     segment: string | null;
     territory: string | null;
+    annualTarget: unknown;
+    startDate: Date | null;
     user: { fullName: string | null; email: string; profileImageUrl: string | null };
     commissionPlan: { 
       id: string; 
@@ -148,7 +232,12 @@ export default async function DashboardPage(props: {
     // Use the logged-in user's AE profile
     const myAE = await prisma.aEProfile.findUnique({
       where: { userId },
-      include: { 
+      select: {
+        id: true,
+        segment: true,
+        territory: true,
+        annualTarget: true,
+        startDate: true,
         user: { select: { fullName: true, email: true, profileImageUrl: true } },
         commissionPlan: { 
           select: { 
@@ -224,6 +313,22 @@ export default async function DashboardPage(props: {
   const aeSegment = targetAEProfile?.segment ?? null;
   const aeTerritory = targetAEProfile?.territory ?? null;
   const aeCommissionPlan = targetAEProfile?.commissionPlan ?? null;
+  const aeAnnualTarget = decimalToNumber(targetAEProfile?.annualTarget);
+  const aeStartDate = targetAEProfile?.startDate ?? null;
+
+  // Calculate effective target based on view and ramp period
+  const targetInfo = calculateEffectiveTarget({
+    annualTarget: aeAnnualTarget,
+    startDate: aeStartDate,
+    view,
+    currentYear: year,
+    currentQuarter: quarter,
+  });
+
+  // Calculate variance
+  const variance = totalAmount - targetInfo.target;
+  const variancePercent = targetInfo.target > 0 ? (variance / targetInfo.target) * 100 : 0;
+  const isAheadOfTarget = variance >= 0;
 
   return (
     <div className="px-6 py-10">
@@ -283,6 +388,21 @@ export default async function DashboardPage(props: {
                   <div className="mt-1 text-sm text-zinc-400">No plan assigned</div>
                 )}
               </div>
+
+              {/* Target Card */}
+              <div className="hidden sm:block rounded-xl border border-zinc-200 bg-white px-5 py-3">
+                <div className="text-xs text-zinc-500">{targetInfo.label}</div>
+                {aeAnnualTarget > 0 ? (
+                  <>
+                    <div className="mt-1 font-medium text-zinc-900">{formatCurrency(targetInfo.target)}</div>
+                    <div className="mt-0.5 text-sm text-zinc-500">
+                      Annual: {formatCurrency(aeAnnualTarget)}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-1 text-sm text-zinc-400">No target set</div>
+                )}
+              </div>
             </div>
 
             {/* Right: Admin AE Selector */}
@@ -299,6 +419,11 @@ export default async function DashboardPage(props: {
             <div className="rounded-xl border border-zinc-200 bg-white p-5">
               <div className="text-sm text-zinc-600">Closed Won Amount</div>
               <div className="mt-2 text-2xl font-semibold">{formatCurrency(totalAmount)}</div>
+              {targetInfo.target > 0 && (
+                <div className={`mt-1 text-xs font-medium ${isAheadOfTarget ? "text-green-600" : "text-red-600"}`}>
+                  {isAheadOfTarget ? "▲" : "▼"} {formatCurrency(Math.abs(variance))} ({variancePercent >= 0 ? "+" : ""}{variancePercent.toFixed(1)}%) vs target
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-zinc-200 bg-white p-5">
               <div className="text-sm text-zinc-600">Commission Earned</div>
