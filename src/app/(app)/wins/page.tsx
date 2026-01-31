@@ -193,6 +193,14 @@ export default async function WinsPage(props: {
                         </tr>
                       );
                     })}
+                    {/* Totals row */}
+                    <tr className="border-t-2 border-zinc-200 bg-zinc-50 font-medium">
+                      <td className="px-5 py-4 text-zinc-700">Total ({wins.length} deals)</td>
+                      <td className="px-5 py-4"></td>
+                      {role === "ADMIN" ? <td className="px-5 py-4"></td> : null}
+                      <td className="px-5 py-4 text-zinc-950">{formatCurrency(totalAmount)}</td>
+                      <td className="px-5 py-4"></td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
