@@ -1,5 +1,11 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 
+import {
+  getPreviousQuarter,
+  getQuarterDateRangeUTC,
+  getQuarterForDate,
+} from "@/lib/quarters";
 import { authOptions } from "@/server/auth";
 import { prisma } from "@/server/db";
 
@@ -28,12 +34,38 @@ function formatDate(d: Date) {
   return d.toLocaleDateString("en-US");
 }
 
-export default async function WinsPage() {
+type WinsView = "ytd" | "qtd" | "prevq";
+
+function isWinsView(v: unknown): v is WinsView {
+  return v === "ytd" || v === "qtd" || v === "prevq";
+}
+
+export default async function WinsPage(props: {
+  searchParams?: Promise<{ view?: string }>;
+}) {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id ?? null;
   const role = session?.user?.role ?? "AE";
 
   if (!userId) return null;
+
+  const sp = (await props.searchParams) ?? {};
+  const view: WinsView = isWinsView(sp.view) ? sp.view : "qtd";
+
+  // Calculate date range based on selected view
+  const now = new Date();
+  const { year, quarter } = getQuarterForDate(now);
+  const { start: qtdStart, end: qtdEnd } = getQuarterDateRangeUTC(year, quarter);
+  const prev = getPreviousQuarter(year, quarter);
+  const { start: prevStart, end: prevEnd } = getQuarterDateRangeUTC(prev.year, prev.quarter);
+  const ytdStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
+
+  const range =
+    view === "ytd"
+      ? { start: ytdStart, end: now }
+      : view === "prevq"
+        ? { start: prevStart, end: prevEnd }
+        : { start: qtdStart, end: qtdEnd };
 
   const aeProfileId =
     role === "ADMIN"
@@ -49,6 +81,7 @@ export default async function WinsPage() {
     where: {
       ...(aeProfileId ? { aeProfileId } : {}),
       status: { contains: "won", mode: "insensitive" },
+      closeDate: { gte: range.start, lte: range.end },
     },
     orderBy: [{ closeDate: "desc" }],
     take: 500,
@@ -86,18 +119,41 @@ export default async function WinsPage() {
     <div className="px-6 py-10">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-6">
-          <header className="flex flex-col gap-2">
-            <div className="text-sm text-zinc-600">{role === "ADMIN" ? "All AEs" : "My wins"}</div>
-            <h1 className="text-2xl font-semibold tracking-tight">Wins</h1>
-            <div className="text-sm text-zinc-600">
-              {wins.length} wins • {formatCurrency(totalAmount)} total
+          <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm text-zinc-600">{role === "ADMIN" ? "All AEs" : "My wins"}</div>
+              <h1 className="text-2xl font-semibold tracking-tight">Wins</h1>
+              <div className="text-sm text-zinc-600">
+                {wins.length} wins • {formatCurrency(totalAmount)} total
+              </div>
+            </div>
+
+            {/* Period Selector */}
+            <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+              <Link
+                href={{ pathname: "/wins", query: { view: "ytd" } }}
+                className={`rounded-md px-3 py-1.5 ${view === "ytd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+              >
+                YTD
+              </Link>
+              <Link
+                href={{ pathname: "/wins", query: { view: "qtd" } }}
+                className={`rounded-md px-3 py-1.5 ${view === "qtd" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+              >
+                QTD
+              </Link>
+              <Link
+                href={{ pathname: "/wins", query: { view: "prevq" } }}
+                className={`rounded-md px-3 py-1.5 ${view === "prevq" ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-50"}`}
+              >
+                Prev Q
+              </Link>
             </div>
           </header>
 
           {wins.length === 0 ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-700">
-              No wins found yet. If you expect to see deals here, run an Attio sync (Admin) and make sure your Attio
-              account is connected.
+              No wins found for this period. Try selecting a different time range.
             </div>
           ) : (
             <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
@@ -147,4 +203,3 @@ export default async function WinsPage() {
     </div>
   );
 }
-
