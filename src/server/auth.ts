@@ -147,7 +147,7 @@ export const authOptions: NextAuthOptions = {
 
       // Trigger a full Attio sync in the background (fire-and-forget)
       // This ensures any new deals since the last hourly sync are pulled in
-      runAttioSync().catch((e) => {
+      runAttioSync({ actorUserId: null }).catch((e) => {
         console.warn("[auth] Background Attio sync failed:", e);
       });
 
