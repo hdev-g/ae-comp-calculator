@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 
 import { AESelector } from "@/components/AESelector";
-import { DealsTable } from "@/components/DealsTable";
+import { DashboardContent } from "@/components/DashboardContent";
 
 // Force dynamic rendering to ensure page updates on navigation
 export const dynamic = "force-dynamic";
@@ -205,6 +205,10 @@ export default async function DashboardPage(props: {
                 select: { id: true, name: true, rateAdd: true },
                 orderBy: { name: "asc" },
               },
+              performanceAccelerators: {
+                select: { id: true, minAttainment: true, maxAttainment: true, commissionRate: true },
+                orderBy: { minAttainment: "asc" },
+              },
             } 
           },
         },
@@ -231,6 +235,7 @@ export default async function DashboardPage(props: {
       name: string; 
       baseCommissionRate: unknown;
       bonusRules: { id: string; name: string; rateAdd: unknown }[];
+      performanceAccelerators: { id: string; minAttainment: unknown; maxAttainment: unknown; commissionRate: unknown }[];
     } | null;
   } | null = null;
 
@@ -263,6 +268,10 @@ export default async function DashboardPage(props: {
               select: { id: true, name: true, rateAdd: true },
               orderBy: { name: "asc" },
             },
+            performanceAccelerators: {
+              select: { id: true, minAttainment: true, maxAttainment: true, commissionRate: true },
+              orderBy: { minAttainment: "asc" },
+            },
           } 
         },
       },
@@ -274,17 +283,23 @@ export default async function DashboardPage(props: {
 
   const targetAEProfileId = targetAEProfile?.id ?? null;
 
-  const dealsFromDb = targetAEProfileId
+  // Always fetch YTD deals for attainment calculation
+  const ytdDealsFromDb = targetAEProfileId
     ? await prisma.deal.findMany({
         where: {
           aeProfileId: targetAEProfileId,
           status: { contains: "won", mode: "insensitive" },
-          closeDate: { gte: range.start, lte: range.end },
+          closeDate: { gte: ytdStart, lte: now },
         },
         orderBy: [{ closeDate: "desc" }],
         take: 500,
       })
     : [];
+
+  // Filter deals for the selected view range
+  const dealsFromDb = ytdDealsFromDb.filter((d) => 
+    d.closeDate >= range.start && d.closeDate <= range.end
+  );
 
   // Transform deals for the table
   const dealsForTable = dealsFromDb.map((d) => ({
@@ -305,21 +320,76 @@ export default async function DashboardPage(props: {
     rateAdd: decimalToNumber(r.rateAdd),
   })) ?? [];
 
+  // Get performance accelerators for the AE's commission plan
+  const performanceAccelerators = targetAEProfile?.commissionPlan?.performanceAccelerators.map((a) => ({
+    id: a.id,
+    minAttainment: decimalToNumber(a.minAttainment),
+    maxAttainment: a.maxAttainment !== null ? decimalToNumber(a.maxAttainment) : null,
+    commissionRate: decimalToNumber(a.commissionRate),
+  })) ?? [];
+
+  // Calculate YTD total for attainment (always based on full YTD, not view)
+  const ytdTotalAmount = ytdDealsFromDb.reduce((sum, d) => sum + decimalToNumber(d.amount), 0);
+
+  // Get annual target and calculate attainment
+  const aeAnnualTarget = decimalToNumber(targetAEProfile?.annualTarget);
+  const aeStartDate = targetAEProfile?.startDate ?? null;
+
+  // Calculate adjusted annual target (accounting for ramp)
+  const adjustedTargetInfo = calculateEffectiveTarget({
+    annualTarget: aeAnnualTarget,
+    startDate: aeStartDate,
+    view: "ytd", // Always use YTD to get the adjusted annual target
+    currentYear: year,
+    currentQuarter: quarter,
+  });
+  const adjustedAnnualTarget = adjustedTargetInfo.adjustedAnnualTarget;
+
+  // Calculate quota attainment percentage (YTD closed / adjusted annual target)
+  const quotaAttainment = adjustedAnnualTarget > 0 
+    ? (ytdTotalAmount / adjustedAnnualTarget) * 100 
+    : 0;
+
+  // Base rate stays constant for individual deal calculations
   const baseRate = targetAEProfile?.commissionPlan?.baseCommissionRate 
     ? decimalToNumber(targetAEProfile.commissionPlan.baseCommissionRate) 
     : 0;
 
-  // Calculate totals
-  const totalAmount = dealsForTable.reduce((sum, d) => sum + d.amount, 0);
-  const totalCommission = dealsForTable.reduce((sum, d) => {
-    let rate = baseRate;
-    for (const rule of bonusRules) {
-      if (d.appliedBonusRuleIds.includes(rule.id)) {
-        rate += rule.rateAdd;
+  // Find the applicable accelerator tier based on attainment
+  let currentTier: { minAttainment: number; maxAttainment: number | null; commissionRate: number } | null = null;
+
+  if (performanceAccelerators.length > 0) {
+    // Find the tier that matches current attainment
+    for (const tier of performanceAccelerators) {
+      const meetsMin = quotaAttainment >= tier.minAttainment;
+      const meetsMax = tier.maxAttainment === null || quotaAttainment <= tier.maxAttainment;
+      if (meetsMin && meetsMax) {
+        currentTier = tier;
       }
     }
-    return sum + (d.amount * rate);
-  }, 0);
+    // If no tier matched (e.g., attainment is 0%), use the first tier
+    if (!currentTier && performanceAccelerators.length > 0) {
+      currentTier = performanceAccelerators[0];
+    }
+  }
+
+  // Calculate Annual Accelerator bonus:
+  // Accelerator ONLY kicks in once user achieves 100% of quota.
+  // Then they get (tier rate - base rate) on all revenue over target.
+  let annualAcceleratorBonus = 0;
+  const amountOverTarget = Math.max(0, ytdTotalAmount - adjustedAnnualTarget);
+  
+  // Only apply accelerator if:
+  // 1. They've hit 100% quota attainment
+  // 2. There's revenue over target
+  // 3. The tier rate is higher than base rate (uplift, not reduction)
+  if (quotaAttainment >= 100 && amountOverTarget > 0 && currentTier && adjustedAnnualTarget > 0) {
+    const acceleratorRate = currentTier.commissionRate - baseRate;
+    // Only apply positive accelerators (bonus for exceeding target)
+    if (acceleratorRate > 0) {
+      annualAcceleratorBonus = amountOverTarget * acceleratorRate;
+    }
+  }
 
   // AE display info
   const aeName = targetAEProfile?.user.fullName ?? targetAEProfile?.user.email ?? "Unknown";
@@ -327,10 +397,8 @@ export default async function DashboardPage(props: {
   const aeSegment = targetAEProfile?.segment ?? null;
   const aeTerritory = targetAEProfile?.territory ?? null;
   const aeCommissionPlan = targetAEProfile?.commissionPlan ?? null;
-  const aeAnnualTarget = decimalToNumber(targetAEProfile?.annualTarget);
-  const aeStartDate = targetAEProfile?.startDate ?? null;
 
-  // Calculate effective target based on view and ramp period
+  // Calculate effective target based on view and ramp period (for variance display)
   const targetInfo = calculateEffectiveTarget({
     annualTarget: aeAnnualTarget,
     startDate: aeStartDate,
@@ -338,11 +406,6 @@ export default async function DashboardPage(props: {
     currentYear: year,
     currentQuarter: quarter,
   });
-
-  // Calculate variance
-  const variance = totalAmount - targetInfo.target;
-  const variancePercent = targetInfo.target > 0 ? (variance / targetInfo.target) * 100 : 0;
-  const isAheadOfTarget = variance >= 0;
 
   return (
     <div className="px-6 py-10">
@@ -388,37 +451,50 @@ export default async function DashboardPage(props: {
                 </div>
               </div>
 
-              {/* Commission Plan Card */}
-              <div className="hidden sm:block rounded-xl border border-zinc-200 bg-white px-5 py-3">
-                <div className="text-xs text-zinc-500">Commission Plan</div>
-                {aeCommissionPlan ? (
-                  <>
-                    <div className="mt-1 font-medium text-zinc-900">{aeCommissionPlan.name}</div>
-                    <div className="mt-0.5 text-sm text-zinc-500">
-                      Base rate: {formatPercent(baseRate)}
-                    </div>
-                  </>
-                ) : (
-                  <div className="mt-1 text-sm text-zinc-400">No plan assigned</div>
-                )}
-              </div>
-
-              {/* Target Card */}
-              <div className="hidden sm:block rounded-xl border border-zinc-200 bg-white px-5 py-3">
-                <div className="text-xs text-zinc-500">{targetInfo.label}</div>
-                {aeAnnualTarget > 0 ? (
-                  <>
-                    <div className="mt-1 font-medium text-zinc-900">{formatCurrency(targetInfo.target)}</div>
-                    <div className="mt-0.5 text-sm text-zinc-500">
-                      Annual: {formatCurrency(targetInfo.adjustedAnnualTarget)}
-                      {targetInfo.adjustedAnnualTarget < aeAnnualTarget && (
-                        <span className="text-zinc-400"> (ramp)</span>
+              {/* Cards Container - equal height */}
+              <div className="hidden sm:flex items-stretch gap-4">
+                {/* Commission Plan Card */}
+                <div className="rounded-xl border border-zinc-200 bg-white px-5 py-3">
+                  <div className="text-xs text-zinc-500">Commission Plan</div>
+                  {aeCommissionPlan ? (
+                    <>
+                      <div className="mt-1 font-medium text-zinc-900">{aeCommissionPlan.name}</div>
+                      <div className="mt-0.5 text-sm text-zinc-500">
+                        Base rate: {formatPercent(baseRate)}
+                      </div>
+                      {performanceAccelerators.length > 0 && (
+                        <div className="mt-1 text-xs text-zinc-400">
+                          Attainment: {quotaAttainment.toFixed(1)}%
+                          {currentTier && amountOverTarget > 0 && (
+                            <span className="text-violet-600">
+                              {" "}• +{formatPercent(currentTier.commissionRate - baseRate)} accelerator
+                            </span>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="mt-1 text-sm text-zinc-400">No target set</div>
-                )}
+                    </>
+                  ) : (
+                    <div className="mt-1 text-sm text-zinc-400">No plan assigned</div>
+                  )}
+                </div>
+
+                {/* Target Card */}
+                <div className="rounded-xl border border-zinc-200 bg-white px-5 py-3">
+                  <div className="text-xs text-zinc-500">{targetInfo.label}</div>
+                  {aeAnnualTarget > 0 ? (
+                    <>
+                      <div className="mt-1 font-medium text-zinc-900">{formatCurrency(targetInfo.target)}</div>
+                      <div className="mt-0.5 text-sm text-zinc-500">
+                        Annual: {formatCurrency(targetInfo.adjustedAnnualTarget)}
+                        {targetInfo.adjustedAnnualTarget < aeAnnualTarget && (
+                          <span className="text-zinc-400"> (ramp)</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-1 text-sm text-zinc-400">No target set</div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -432,35 +508,15 @@ export default async function DashboardPage(props: {
             )}
           </header>
 
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-zinc-200 bg-white p-5">
-              <div className="text-sm text-zinc-600">Closed Won Amount</div>
-              <div className="mt-2 text-2xl font-semibold">{formatCurrency(totalAmount)}</div>
-              {targetInfo.target > 0 && (
-                <div className={`mt-1 text-xs font-medium ${isAheadOfTarget ? "text-green-600" : "text-red-600"}`}>
-                  {isAheadOfTarget ? "▲" : "▼"} {formatCurrency(Math.abs(variance))} ({variancePercent >= 0 ? "+" : ""}{variancePercent.toFixed(1)}%) vs target
-                </div>
-              )}
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-5">
-              <div className="text-sm text-zinc-600">Commission Earned</div>
-              <div className="mt-2 text-2xl font-semibold">{formatCurrency(totalCommission)}</div>
-              {!aeCommissionPlan && (
-                <div className="mt-1 text-xs text-zinc-500">No commission plan assigned.</div>
-              )}
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-5">
-              <div className="text-sm text-zinc-600">Deals Count</div>
-              <div className="mt-2 text-2xl font-semibold">{dealsForTable.length}</div>
-            </div>
-          </section>
-
-          <DealsTable
+          <DashboardContent
             deals={dealsForTable}
             bonusRules={bonusRules}
             baseRate={baseRate}
             view={view}
             selectedAEId={selectedAEId}
+            targetAmount={targetInfo.target}
+            annualAcceleratorBonus={annualAcceleratorBonus}
+            hasCommissionPlan={!!aeCommissionPlan}
           />
         </div>
       </div>

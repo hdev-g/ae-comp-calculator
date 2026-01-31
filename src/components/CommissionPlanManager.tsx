@@ -224,7 +224,7 @@ export function CommissionPlanManager() {
                   </div>
                   {plan.bonusRules.length > 0 && (
                     <div className="mt-3 flex flex-col gap-1">
-                      <div className="text-xs font-medium text-zinc-500">Bonus Rules:</div>
+                      <div className="text-xs font-medium text-zinc-500">Deal Accelerators:</div>
                       {plan.bonusRules
                         .filter((r) => r.enabled)
                         .map((r, idx) => (
@@ -435,9 +435,9 @@ function PlanForm(props: {
       <div className="rounded-xl border border-zinc-200 bg-white p-6">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-medium text-zinc-900">Bonus Rules</div>
+            <div className="font-medium text-zinc-900">Deal Accelerators</div>
             <p className="mt-1 text-sm text-zinc-500">
-              Additional commission percentages. Set dates for time-limited incentives.
+              Additional commission percentages per deal. Set dates for time-limited incentives.
             </p>
           </div>
           <button
@@ -445,7 +445,7 @@ function PlanForm(props: {
             onClick={addBonusRule}
             className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
           >
-            Add Rule
+            Add Accelerator
           </button>
         </div>
 
@@ -464,7 +464,7 @@ function PlanForm(props: {
                       type="text"
                       value={rule.name}
                       onChange={(e) => updateBonusRule(index, { name: e.target.value })}
-                      placeholder="e.g. Multi-year deal bonus"
+                      placeholder="e.g. Multi-year deal, Annual prepayment"
                       required
                       className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
                     />
