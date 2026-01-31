@@ -2,6 +2,9 @@ import { getServerSession } from "next-auth";
 
 import { AESelector } from "@/components/AESelector";
 import { DealsTable } from "@/components/DealsTable";
+
+// Force dynamic rendering to ensure page updates on navigation
+export const dynamic = "force-dynamic";
 import {
   getPreviousQuarter,
   getQuarterDateRangeUTC,
@@ -71,6 +74,7 @@ function getTerritoryColors(territory: string): string {
  * Calculate effective target based on view, annual target, and start date.
  * - First quarter after start date = 50% of normal quarterly target
  * - Full year target is adjusted if started mid-year
+ * - adjustedAnnualTarget shows what the user's actual annual target is accounting for ramp
  */
 function calculateEffectiveTarget(params: {
   annualTarget: number;
@@ -78,11 +82,11 @@ function calculateEffectiveTarget(params: {
   view: DashboardView;
   currentYear: number;
   currentQuarter: number;
-}): { target: number; isRampQuarter: boolean; label: string } {
+}): { target: number; adjustedAnnualTarget: number; isRampQuarter: boolean; label: string } {
   const { annualTarget, startDate, view, currentYear, currentQuarter } = params;
   
   if (annualTarget <= 0) {
-    return { target: 0, isRampQuarter: false, label: "No target set" };
+    return { target: 0, adjustedAnnualTarget: 0, isRampQuarter: false, label: "No target set" };
   }
   
   const quarterlyTarget = annualTarget / 4;
@@ -100,27 +104,42 @@ function calculateEffectiveTarget(params: {
     }
   }
   
+  // Calculate adjusted annual target (accounts for ramp and quarters not employed)
+  // E.g., $1M target, starts Q1: 3 full quarters + 1 ramp = $875k
+  // E.g., $1M target, starts Q2: 2 full quarters + 1 ramp = $625k
+  // E.g., $1M target, starts Q3: 1 full quarter + 1 ramp = $375k
+  // E.g., $1M target, starts Q4: 0 full quarters + 1 ramp = $125k
+  let adjustedAnnualTarget = annualTarget;
+  if (startedThisYear && startQuarter !== null) {
+    const fullQuartersRemaining = 4 - startQuarter; // Quarters after the start quarter
+    const rampQuarterTarget = quarterlyTarget * 0.5;
+    adjustedAnnualTarget = rampQuarterTarget + (fullQuartersRemaining * quarterlyTarget);
+  }
+  
   if (view === "qtd") {
     // Current quarter target
     const isRampQuarter = startedThisYear && startQuarter === currentQuarter;
     const target = isRampQuarter ? quarterlyTarget * 0.5 : quarterlyTarget;
     return { 
       target, 
+      adjustedAnnualTarget,
       isRampQuarter, 
       label: isRampQuarter ? `Q${currentQuarter} Target (Ramp)` : `Q${currentQuarter} Target`
     };
   }
   
   if (view === "ytd") {
-    // Sum of all quarters from Q1 to current quarter
+    // Sum of all quarters from start quarter to current quarter
     let ytdTarget = 0;
-    for (let q = 1; q <= currentQuarter; q++) {
+    const effectiveStartQ = startedThisYear && startQuarter ? startQuarter : 1;
+    for (let q = effectiveStartQ; q <= currentQuarter; q++) {
       const isRampQ = startedThisYear && startQuarter === q;
       ytdTarget += isRampQ ? quarterlyTarget * 0.5 : quarterlyTarget;
     }
     const hasRamp = startedThisYear && startQuarter !== null && startQuarter <= currentQuarter;
     return { 
       target: ytdTarget, 
+      adjustedAnnualTarget,
       isRampQuarter: hasRamp, 
       label: hasRamp ? "YTD Target (incl. ramp)" : "YTD Target"
     };
@@ -136,12 +155,13 @@ function calculateEffectiveTarget(params: {
     const target = isRampQuarter ? quarterlyTarget * 0.5 : quarterlyTarget;
     return { 
       target, 
+      adjustedAnnualTarget,
       isRampQuarter: !!isRampQuarter, 
       label: isRampQuarter ? `Q${prevQ} Target (Ramp)` : `Q${prevQ} Target`
     };
   }
   
-  return { target: annualTarget, isRampQuarter: false, label: "Annual Target" };
+  return { target: annualTarget, adjustedAnnualTarget, isRampQuarter: false, label: "Annual Target" };
 }
 
 export default async function DashboardPage(props: {
@@ -396,7 +416,10 @@ export default async function DashboardPage(props: {
                   <>
                     <div className="mt-1 font-medium text-zinc-900">{formatCurrency(targetInfo.target)}</div>
                     <div className="mt-0.5 text-sm text-zinc-500">
-                      Annual: {formatCurrency(aeAnnualTarget)}
+                      Annual: {formatCurrency(targetInfo.adjustedAnnualTarget)}
+                      {targetInfo.adjustedAnnualTarget < aeAnnualTarget && (
+                        <span className="text-zinc-400"> (ramp)</span>
+                      )}
                     </div>
                   </>
                 ) : (
