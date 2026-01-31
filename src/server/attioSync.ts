@@ -270,8 +270,15 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
     .filter((d) => (d!.status ?? "").toLowerCase().includes("won"));
 
   const dealUpserts = await Promise.all(
-    parsedDeals.map((d) =>
-      prisma.deal.upsert({
+    parsedDeals.map((d) => {
+      // Extract RevOps approval status from Attio payload
+      const raw = asRecord(d!.raw);
+      const values = asRecord(raw?.values) ?? asRecord(raw?.attributes) ?? raw;
+      const revOpsApproved = extractAttributeValue(values, "revops_-_approved") || 
+                             extractAttributeValue(values, "revops_approved") ||
+                             extractAttributeValue(values, "rev_ops_approved");
+      
+      return prisma.deal.upsert({
         where: { attioRecordId: d!.attioRecordId },
         update: {
           dealName: d!.dealName,
@@ -282,6 +289,7 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
           status: d!.status,
           attioOwnerWorkspaceMemberId: d!.ownerWorkspaceMemberId ?? null,
           rawAttioPayload: d!.raw as Prisma.InputJsonValue,
+          revOpsApproved,
         },
         create: {
           attioRecordId: d!.attioRecordId,
@@ -293,10 +301,11 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
           status: d!.status,
           attioOwnerWorkspaceMemberId: d!.ownerWorkspaceMemberId ?? null,
           rawAttioPayload: d!.raw as Prisma.InputJsonValue,
+          revOpsApproved,
         },
         select: { id: true },
-      }),
-    ),
+      });
+    }),
   );
 
   const result: AttioSyncResult = {

@@ -168,6 +168,7 @@ model Deal {
   isMultiYear              Boolean @default(false)
   hasTestimonialCommitment Boolean @default(false)
   hasMarketingCommitment   Boolean @default(false)
+  revOpsApproved           Boolean @default(false)
 
   // JSON array of bonus rule IDs that apply to this deal
   appliedBonusRuleIds Json @default("[]")

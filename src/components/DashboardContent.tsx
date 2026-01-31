@@ -18,6 +18,7 @@ type Deal = {
   amount: number;
   closeDate: string;
   appliedBonusRuleIds: string[];
+  revOpsApproved: boolean;
 };
 
 type DashboardContentProps = {
@@ -225,6 +226,7 @@ export function DashboardContent({
                     <div className="text-[10px] font-normal text-zinc-400">+{formatPercent(rule.rateAdd)}</div>
                   </th>
                 ))}
+                <th className="w-28 px-3 py-3 font-medium text-center">RevOps Status</th>
                 <th className="w-20 px-5 py-3 font-medium text-right">Rate</th>
                 <th className="w-32 px-5 py-3 font-medium text-right">Commission</th>
               </tr>
@@ -232,7 +234,7 @@ export function DashboardContent({
             <tbody>
               {deals.length === 0 ? (
                 <tr>
-                  <td colSpan={5 + bonusRules.length} className="px-5 py-8 text-center text-zinc-500">
+                  <td colSpan={6 + bonusRules.length} className="px-5 py-8 text-center text-zinc-500">
                     No closed won deals in this period.
                   </td>
                 </tr>
@@ -287,6 +289,17 @@ export function DashboardContent({
                             </td>
                           );
                         })}
+                        <td className="w-28 px-3 py-4 text-center">
+                          {deal.revOpsApproved ? (
+                            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+                              Pending
+                            </span>
+                          )}
+                        </td>
                         <td className="w-20 px-5 py-4 text-right">
                           <div className="font-medium text-zinc-900">{formatPercent(totalRate)}</div>
                         </td>
@@ -304,6 +317,7 @@ export function DashboardContent({
                     {bonusRules.map((rule) => (
                       <td key={rule.id} className="px-3 py-4"></td>
                     ))}
+                    <td className="w-28 px-3 py-4"></td>
                     <td className="w-20 px-5 py-4"></td>
                     <td className="w-32 px-5 py-4 text-right text-zinc-950">{formatCurrency(totals.commission)}</td>
                   </tr>

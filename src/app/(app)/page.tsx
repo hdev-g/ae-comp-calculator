@@ -311,6 +311,7 @@ export default async function DashboardPage(props: {
     appliedBonusRuleIds: Array.isArray(d.appliedBonusRuleIds) 
       ? (d.appliedBonusRuleIds as string[])
       : [],
+    revOpsApproved: d.revOpsApproved,
   }));
 
   // Get bonus rules for the AE's commission plan
