@@ -3,6 +3,7 @@ import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 
 import { reconcileDealsToAEs } from "@/server/aeDealAssignment";
+import { runAttioSync } from "@/server/attioSync";
 import { prisma } from "@/server/db";
 import { findWorkspaceMemberByEmail } from "@/server/attioClient";
 import { getAllowedEmailDomains, getSeedAdminEmails } from "@/server/env";
@@ -143,6 +144,12 @@ export const authOptions: NextAuthOptions = {
       } catch (e) {
         console.warn("[auth] Attio member auto-link failed:", e);
       }
+
+      // Trigger a full Attio sync in the background (fire-and-forget)
+      // This ensures any new deals since the last hourly sync are pulled in
+      runAttioSync().catch((e) => {
+        console.warn("[auth] Background Attio sync failed:", e);
+      });
 
       return true;
     },
