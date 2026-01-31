@@ -19,9 +19,13 @@ export function AdminAttioSyncButton() {
       const data = asRecord(json);
       if (!res.ok) throw new Error((data?.["error"] as string | undefined) ?? `Sync failed (${res.status})`);
       setStatus("done");
-      setMessage(
-        `OK: members=${String(data?.["membersFetched"] ?? "?")}, deals=${String(data?.["dealsFetched"] ?? "?")}, parsed=${String(data?.["dealsParsed"] ?? "?")}`,
-      );
+      const parts = [
+        `Members: ${String(data?.["membersFetched"] ?? "?")}`,
+        `Deals: ${String(data?.["dealsParsed"] ?? "?")}`,
+        `Assigned: ${String(data?.["dealsAssigned"] ?? "0")}`,
+        `Users linked: ${String(data?.["aeProfilesLinked"] ?? "0")}`,
+      ];
+      setMessage(`✓ Sync complete — ${parts.join(" • ")}`);
     } catch (e) {
       setStatus("error");
       setMessage(e instanceof Error ? e.message : "Sync failed");
@@ -39,7 +43,7 @@ export function AdminAttioSyncButton() {
         {status === "running" ? "Running…" : "Run Attio sync"}
       </button>
       {message ? (
-        <div className={status === "error" ? "text-sm text-red-300" : "text-sm text-zinc-200"}>
+        <div className={status === "error" ? "text-sm text-red-600" : "text-sm text-zinc-600"}>
           {message}
         </div>
       ) : null}
