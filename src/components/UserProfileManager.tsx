@@ -55,6 +55,19 @@ function XIcon({ className }: { className?: string }) {
   );
 }
 
+// Format number with comma separators
+function formatNumberWithCommas(num: number | null): string {
+  if (num === null || num === 0) return "";
+  return num.toLocaleString("en-US");
+}
+
+// Parse number from string with commas
+function parseNumberWithCommas(str: string): number {
+  const cleaned = str.replace(/,/g, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 // Input that only saves on blur (not on every keystroke)
 function DebouncedNumberInput({
   value,
@@ -69,25 +82,33 @@ function DebouncedNumberInput({
   placeholder?: string;
   className?: string;
 }) {
-  const [localValue, setLocalValue] = useState(value?.toString() ?? "");
+  const [localValue, setLocalValue] = useState(formatNumberWithCommas(value));
+  const [isFocused, setIsFocused] = useState(false);
 
-  // Sync local value when prop changes (e.g., after save)
+  // Sync local value when prop changes (e.g., after save) - but only if not focused
   useEffect(() => {
-    setLocalValue(value?.toString() ?? "");
-  }, [value]);
+    if (!isFocused) {
+      setLocalValue(formatNumberWithCommas(value));
+    }
+  }, [value, isFocused]);
 
   return (
     <input
-      type="number"
+      type="text"
+      inputMode="numeric"
       value={localValue}
-      onChange={(e) => setLocalValue(e.target.value)}
+      onChange={(e) => {
+        // Allow only numbers and commas
+        const cleaned = e.target.value.replace(/[^0-9,]/g, "");
+        setLocalValue(cleaned);
+      }}
+      onFocus={() => setIsFocused(true)}
       onBlur={() => {
-        const num = parseFloat(localValue);
-        if (!isNaN(num) && num > 0) {
-          onSave(num);
-        } else if (localValue === "" || localValue === "0") {
-          onSave(0);
-        }
+        setIsFocused(false);
+        const num = parseNumberWithCommas(localValue);
+        // Format the display value with commas
+        setLocalValue(formatNumberWithCommas(num || null));
+        onSave(num);
       }}
       placeholder={placeholder}
       disabled={disabled}
