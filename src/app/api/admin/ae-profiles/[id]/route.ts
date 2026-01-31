@@ -25,6 +25,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       segment?: string | null; 
       territory?: string | null;
       commissionPlanId?: string | null;
+      annualTarget?: number | null;
+      startDate?: Date | null;
     } = {};
 
     // Build update data for User (for admin role)
@@ -53,6 +55,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if ("commissionPlanId" in data) {
       profileUpdateData.commissionPlanId = typeof data.commissionPlanId === "string" && data.commissionPlanId.trim() 
         ? data.commissionPlanId.trim() 
+        : null;
+    }
+
+    if ("annualTarget" in data) {
+      profileUpdateData.annualTarget = typeof data.annualTarget === "number" && data.annualTarget > 0
+        ? data.annualTarget
+        : null;
+    }
+
+    if ("startDate" in data) {
+      profileUpdateData.startDate = typeof data.startDate === "string" && data.startDate.trim()
+        ? new Date(data.startDate)
         : null;
     }
 

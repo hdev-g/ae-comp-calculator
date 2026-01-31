@@ -61,6 +61,8 @@ model AEProfile {
   id                     String          @id @default(cuid())
   userId                 String          @unique
   annualCommissionAmount Decimal?
+  annualTarget           Decimal?        // Annual quota/target amount
+  startDate              DateTime?       // Start date for ramp period calculation
   attioWorkspaceMemberId String?         @unique
   jobRole                String?         // e.g. "Account Executive", "Account Manager"
   segment                String?         // e.g. "Mid-Market", "Enterprise"

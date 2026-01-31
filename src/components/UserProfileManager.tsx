@@ -15,6 +15,8 @@ type UserProfile = {
   commissionPlanId: string | null;
   commissionPlan: CommissionPlanOption | null;
   attioWorkspaceMemberId: string | null;
+  annualTarget: string | number | null;
+  startDate: string | null;
   user: {
     id: string;
     fullName: string | null;
@@ -86,8 +88,8 @@ export function UserProfileManager() {
 
   async function handleUpdate(
     id: string, 
-    field: "jobRole" | "segment" | "territory" | "commissionPlanId" | "isAdmin", 
-    value: string | boolean
+    field: "jobRole" | "segment" | "territory" | "commissionPlanId" | "isAdmin" | "annualTarget" | "startDate", 
+    value: string | boolean | number
   ) {
     setSaving(id);
     try {
@@ -133,13 +135,15 @@ export function UserProfileManager() {
         <table className="min-w-full text-left text-sm">
           <thead className="bg-zinc-50 text-xs text-zinc-600">
             <tr>
-              <th className="w-[260px] min-w-[260px] px-5 py-3 font-medium">User</th>
-              <th className="px-3 py-3 font-medium">Role</th>
-              <th className="px-3 py-3 font-medium">Segment</th>
-              <th className="px-3 py-3 font-medium">Territory</th>
-              <th className="px-3 py-3 font-medium">Commission Plan</th>
-              <th className="px-3 py-3 font-medium">Access</th>
-              <th className="px-3 py-3 font-medium text-center">Attio</th>
+              <th className="w-[240px] min-w-[240px] px-4 py-3 font-medium">User</th>
+              <th className="px-2 py-3 font-medium">Role</th>
+              <th className="px-2 py-3 font-medium">Segment</th>
+              <th className="px-2 py-3 font-medium">Territory</th>
+              <th className="px-2 py-3 font-medium">Commission Plan</th>
+              <th className="px-2 py-3 font-medium">Annual Target</th>
+              <th className="px-2 py-3 font-medium">Start Date</th>
+              <th className="px-2 py-3 font-medium">Access</th>
+              <th className="px-2 py-3 font-medium text-center">Attio</th>
             </tr>
           </thead>
           <tbody>
@@ -148,16 +152,16 @@ export function UserProfileManager() {
               const isAttioLinked = !!profile.attioWorkspaceMemberId;
               return (
                 <tr key={profile.id} className="border-t border-zinc-100">
-                  <td className="w-[260px] min-w-[260px] px-5 py-4">
+                  <td className="w-[240px] min-w-[240px] px-4 py-4">
                     <div className="flex items-center gap-3">
                       {profile.user.profileImageUrl ? (
                         <img
                           src={profile.user.profileImageUrl}
                           alt={profile.user.fullName ?? profile.user.email}
-                          className="size-10 flex-shrink-0 rounded-full object-cover"
+                          className="size-9 flex-shrink-0 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-600">
+                        <div className="flex size-9 flex-shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-600">
                           {getInitials(profile.user.fullName)}
                         </div>
                       )}
@@ -169,12 +173,12 @@ export function UserProfileManager() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-2 py-4">
                     <select
                       value={profile.jobRole ?? ""}
                       onChange={(e) => handleUpdate(profile.id, "jobRole", e.target.value)}
                       disabled={saving === profile.id}
-                      className="h-8 w-[130px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                      className="h-8 w-[120px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     >
                       <option value="">Not set</option>
                       {JOB_ROLES.map((r) => (
@@ -184,12 +188,12 @@ export function UserProfileManager() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-2 py-4">
                     <select
                       value={profile.segment ?? ""}
                       onChange={(e) => handleUpdate(profile.id, "segment", e.target.value)}
                       disabled={saving === profile.id}
-                      className="h-8 w-[100px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                      className="h-8 w-[90px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     >
                       <option value="">Not set</option>
                       {SEGMENTS.map((s) => (
@@ -199,12 +203,12 @@ export function UserProfileManager() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-2 py-4">
                     <select
                       value={profile.territory ?? ""}
                       onChange={(e) => handleUpdate(profile.id, "territory", e.target.value)}
                       disabled={saving === profile.id}
-                      className="h-8 w-[110px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                      className="h-8 w-[100px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     >
                       <option value="">Not set</option>
                       {TERRITORIES.map((t) => (
@@ -214,12 +218,12 @@ export function UserProfileManager() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-2 py-4">
                     <select
                       value={profile.commissionPlanId ?? ""}
                       onChange={(e) => handleUpdate(profile.id, "commissionPlanId", e.target.value)}
                       disabled={saving === profile.id}
-                      className="h-8 w-[140px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                      className="h-8 w-[130px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     >
                       <option value="">Not assigned</option>
                       {commissionPlans.map((plan) => (
@@ -229,20 +233,45 @@ export function UserProfileManager() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-2 py-4">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-zinc-500">$</span>
+                      <input
+                        type="number"
+                        value={profile.annualTarget ? Number(profile.annualTarget) : ""}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseFloat(e.target.value) : 0;
+                          handleUpdate(profile.id, "annualTarget", val);
+                        }}
+                        placeholder="0"
+                        disabled={saving === profile.id}
+                        className="h-8 w-[90px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                      />
+                    </div>
+                  </td>
+                  <td className="px-2 py-4">
+                    <input
+                      type="date"
+                      value={profile.startDate ? profile.startDate.split("T")[0] : ""}
+                      onChange={(e) => handleUpdate(profile.id, "startDate", e.target.value)}
+                      disabled={saving === profile.id}
+                      className="h-8 w-[110px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                    />
+                  </td>
+                  <td className="px-2 py-4">
                     <select
                       value={isAdmin ? "admin" : "member"}
                       onChange={(e) => handleUpdate(profile.id, "isAdmin", e.target.value === "admin")}
                       disabled={saving === profile.id}
-                      className="h-8 w-[90px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                      className="h-8 w-[80px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     >
                       <option value="member">Member</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>
-                  <td className="px-3 py-4 text-center">
+                  <td className="px-2 py-4 text-center">
                     <div
-                      className={`inline-flex size-8 items-center justify-center rounded-lg border ${
+                      className={`inline-flex size-7 items-center justify-center rounded-lg border ${
                         isAttioLinked
                           ? "border-green-200 bg-green-50 text-green-600"
                           : "border-zinc-200 bg-zinc-50 text-zinc-400"
@@ -250,9 +279,9 @@ export function UserProfileManager() {
                       title={isAttioLinked ? "Synced with Attio" : "Not synced with Attio"}
                     >
                       {isAttioLinked ? (
-                        <CheckIcon className="size-5" />
+                        <CheckIcon className="size-4" />
                       ) : (
-                        <XIcon className="size-5" />
+                        <XIcon className="size-4" />
                       )}
                     </div>
                   </td>
