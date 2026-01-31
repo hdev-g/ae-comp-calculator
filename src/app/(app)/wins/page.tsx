@@ -91,7 +91,6 @@ export default async function WinsPage(props: {
       accountName: true,
       amount: true,
       closeDate: true,
-      status: true,
       attioOwnerWorkspaceMemberId: true,
       aeProfile: {
         select: {
@@ -121,7 +120,7 @@ export default async function WinsPage(props: {
         <div className="flex flex-col gap-6">
           <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-sm text-zinc-600">{role === "ADMIN" ? "All AEs" : "My wins"}</div>
+              <div className="text-sm text-zinc-600">{role === "ADMIN" ? "All Sales Reps" : "My wins"}</div>
               <h1 className="text-2xl font-semibold tracking-tight">Wins</h1>
               <div className="text-sm text-zinc-600">
                 {wins.length} wins • {formatCurrency(totalAmount)} total
@@ -163,9 +162,8 @@ export default async function WinsPage(props: {
                     <tr>
                       <th className="px-5 py-3 font-medium">Deal</th>
                       <th className="px-5 py-3 font-medium">Close Date</th>
-                      {role === "ADMIN" ? <th className="px-5 py-3 font-medium">AE</th> : null}
+                      {role === "ADMIN" ? <th className="px-5 py-3 font-medium">Sales Rep</th> : null}
                       <th className="px-5 py-3 font-medium">Amount</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -174,7 +172,7 @@ export default async function WinsPage(props: {
                       const owner = d.attioOwnerWorkspaceMemberId
                         ? ownerById.get(d.attioOwnerWorkspaceMemberId) ?? null
                         : null;
-                      const aeLabel =
+                      const repLabel =
                         ae?.fullName ??
                         ae?.email ??
                         owner?.fullName ??
@@ -187,9 +185,8 @@ export default async function WinsPage(props: {
                             {d.accountName ? <div className="text-xs text-zinc-500">{d.accountName}</div> : null}
                           </td>
                           <td className="px-5 py-4 text-zinc-700">{formatDate(d.closeDate)}</td>
-                          {role === "ADMIN" ? <td className="px-5 py-4 text-zinc-700">{aeLabel}</td> : null}
+                          {role === "ADMIN" ? <td className="px-5 py-4 text-zinc-700">{repLabel}</td> : null}
                           <td className="px-5 py-4 text-zinc-700">{formatCurrency(d.amount)}</td>
-                          <td className="px-5 py-4 text-zinc-700">{d.status}</td>
                         </tr>
                       );
                     })}
@@ -199,7 +196,6 @@ export default async function WinsPage(props: {
                       <td className="px-5 py-4"></td>
                       {role === "ADMIN" ? <td className="px-5 py-4"></td> : null}
                       <td className="px-5 py-4 text-zinc-950">{formatCurrency(totalAmount)}</td>
-                      <td className="px-5 py-4"></td>
                     </tr>
                   </tbody>
                 </table>

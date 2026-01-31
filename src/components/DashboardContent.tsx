@@ -172,6 +172,9 @@ export function DashboardContent({
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
           <div className="text-sm text-zinc-600">Deals Count</div>
           <div className="mt-2 text-2xl font-semibold">{deals.length}</div>
+          <div className="mt-1 text-xs text-zinc-500">
+            ACV: {formatCurrency(deals.length > 0 ? totals.amount / deals.length : 0)}
+          </div>
         </div>
       </section>
 
