@@ -52,12 +52,12 @@ export type AttioSyncResult = {
 type ParsedDeal = {
   attioRecordId: string;
   dealName: string;
-  accountName: string | null;
+  accountName?: string | null;
   amount: number;
   commissionableAmount: number;
   closeDate: string;
   status: string;
-  ownerWorkspaceMemberId: string | null;
+  ownerWorkspaceMemberId?: string | null;
   raw: unknown;
 };
 
