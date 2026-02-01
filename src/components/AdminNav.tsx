@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 
 const adminNavItems = [
   { href: "/admin/users", label: "Users" },
+  { href: "/admin/reporting", label: "Reporting" },
   { href: "/admin/commission-plans", label: "Commission Plans" },
+  { href: "/admin/fx-rates", label: "FX Rates" },
   { href: "/admin/apps", label: "Apps" },
 ];
 

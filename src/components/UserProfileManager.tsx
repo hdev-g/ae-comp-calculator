@@ -17,6 +17,7 @@ type UserProfile = {
   attioWorkspaceMemberId: string | null;
   annualTarget: string | number | null;
   startDate: string | null;
+  payoutCurrency: string | null;
   user: {
     id: string;
     fullName: string | null;
@@ -29,6 +30,7 @@ type UserProfile = {
 const JOB_ROLES = ["Account Executive", "Account Manager", "Revenue Operations"];
 const SEGMENTS = ["Mid-Market", "Enterprise", "Expansion"];
 const TERRITORIES = ["North America", "EMEA", "APAC", "LATAM"];
+const PAYOUT_CURRENCIES = ["USD", "GBP", "EUR", "CAD", "AUD"];
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return "?";
@@ -168,7 +170,7 @@ export function UserProfileManager({
 
   async function handleUpdate(
     id: string, 
-    field: "jobRole" | "segment" | "territory" | "commissionPlanId" | "isAdmin" | "annualTarget" | "startDate", 
+    field: "jobRole" | "segment" | "territory" | "commissionPlanId" | "isAdmin" | "annualTarget" | "startDate" | "payoutCurrency", 
     value: string | boolean | number
   ) {
     setSaving(id);
@@ -214,6 +216,7 @@ export function UserProfileManager({
               <th className="px-2 py-3 font-medium">Commission Plan</th>
               <th className="px-2 py-3 font-medium">Annual Target</th>
               <th className="px-2 py-3 font-medium">Start Date</th>
+              <th className="px-2 py-3 font-medium">Payout Currency</th>
               <th className="px-2 py-3 font-medium">Access</th>
               <th className="px-2 py-3 font-medium text-center">Attio</th>
             </tr>
@@ -324,6 +327,20 @@ export function UserProfileManager({
                       disabled={saving === profile.id}
                       className="h-8 w-[110px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
                     />
+                  </td>
+                  <td className="px-2 py-4">
+                    <select
+                      value={profile.payoutCurrency ?? "USD"}
+                      onChange={(e) => handleUpdate(profile.id, "payoutCurrency", e.target.value)}
+                      disabled={saving === profile.id}
+                      className="h-8 w-[100px] rounded-md border border-zinc-200 bg-white px-2 text-xs disabled:opacity-50"
+                    >
+                      {PAYOUT_CURRENCIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-2 py-4">
                     <select

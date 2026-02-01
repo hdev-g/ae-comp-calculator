@@ -27,6 +27,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       commissionPlanId?: string | null;
       annualTarget?: number | null;
       startDate?: Date | null;
+      payoutCurrency?: string | null;
     } = {};
 
     // Build update data for User (for admin role)
@@ -68,6 +69,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       profileUpdateData.startDate = typeof data.startDate === "string" && data.startDate.trim()
         ? new Date(data.startDate)
         : null;
+    }
+
+    if ("payoutCurrency" in data) {
+      profileUpdateData.payoutCurrency =
+        typeof data.payoutCurrency === "string" && data.payoutCurrency.trim()
+          ? data.payoutCurrency.trim().toUpperCase()
+          : null;
     }
 
     // Handle isAdmin toggle - updates User.role

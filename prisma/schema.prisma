@@ -67,6 +67,7 @@ model AEProfile {
   jobRole                String?         // e.g. "Account Executive", "Account Manager"
   segment                String?         // e.g. "Mid-Market", "Enterprise"
   territory              String?         // e.g. "West Coast", "EMEA"
+  payoutCurrency         String?         // e.g. "USD", "GBP"
   commissionPlanId       String?         // Assigned commission plan
   status                 AEProfileStatus @default(ACTIVE)
 
@@ -80,6 +81,19 @@ model AEProfile {
 
   @@index([status])
   @@index([commissionPlanId])
+}
+
+model FxRate {
+  id           String   @id @default(cuid())
+  currencyCode String
+  year         Int
+  rate         Decimal  // 1 USD -> rate in currencyCode
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([currencyCode, year])
+  @@index([year])
 }
 
 model AttioWorkspaceMember {
