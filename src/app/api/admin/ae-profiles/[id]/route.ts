@@ -114,18 +114,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
     });
 
-    const results = await prisma.$transaction(
-      hasUserUpdate
-        ? [
-            prisma.user.update({
-              where: { id: existingProfile.userId },
-              data: userUpdateData,
-            }),
-            profileUpdateOp,
-          ]
-        : [profileUpdateOp]
-    );
-    const profile = results[results.length - 1];
+    let profile;
+    if (hasUserUpdate) {
+      const [, updatedProfile] = await prisma.$transaction([
+        prisma.user.update({
+          where: { id: existingProfile.userId },
+          data: userUpdateData,
+        }),
+        profileUpdateOp,
+      ]);
+      profile = updatedProfile;
+    } else {
+      profile = await profileUpdateOp;
+    }
 
     return NextResponse.json({ profile });
   } catch (error) {
