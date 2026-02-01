@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { runAttioSync } from "@/server/attioSync";
 
 function isAuthorized(req: Request) {
+  if (req.headers.get("x-vercel-cron") === "1") return true;
+
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
 
