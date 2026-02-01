@@ -464,7 +464,7 @@ function PlanForm(props: {
               <label className="text-sm font-medium text-zinc-700">Effective Start Date</label>
               <input
                 type="date"
-                value={form.effectiveStartDate}
+                value={formatDate(form.effectiveStartDate)}
                 onChange={(e) => updateField("effectiveStartDate", e.target.value)}
                 required
                 className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900"
@@ -474,7 +474,7 @@ function PlanForm(props: {
               <label className="text-sm font-medium text-zinc-700">Effective End Date</label>
               <input
                 type="date"
-                value={form.effectiveEndDate ?? ""}
+                value={formatDate(form.effectiveEndDate)}
                 onChange={(e) => updateField("effectiveEndDate", e.target.value || null)}
                 className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-4 text-sm text-zinc-900"
               />
@@ -578,7 +578,7 @@ function PlanForm(props: {
                     <label className="text-xs font-medium text-zinc-600">Start Date</label>
                     <input
                       type="date"
-                      value={rule.effectiveStartDate ?? ""}
+                      value={formatDate(rule.effectiveStartDate)}
                       onChange={(e) =>
                         updateBonusRule(index, { effectiveStartDate: e.target.value || null })
                       }
@@ -591,7 +591,7 @@ function PlanForm(props: {
                     <label className="text-xs font-medium text-zinc-600">End Date</label>
                     <input
                       type="date"
-                      value={rule.effectiveEndDate ?? ""}
+                      value={formatDate(rule.effectiveEndDate)}
                       onChange={(e) =>
                         updateBonusRule(index, { effectiveEndDate: e.target.value || null })
                       }
