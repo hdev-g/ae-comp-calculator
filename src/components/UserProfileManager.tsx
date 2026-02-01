@@ -27,7 +27,7 @@ type UserProfile = {
 };
 
 const JOB_ROLES = ["Account Executive", "Account Manager", "Revenue Operations"];
-const SEGMENTS = ["Mid-Market", "Enterprise", "SMB", "Strategic"];
+const SEGMENTS = ["Mid-Market", "Enterprise", "Expansion"];
 const TERRITORIES = ["North America", "EMEA", "APAC", "LATAM"];
 
 function getInitials(name: string | null | undefined): string {
