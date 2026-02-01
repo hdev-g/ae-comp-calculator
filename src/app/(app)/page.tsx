@@ -190,6 +190,7 @@ export default async function DashboardPage(props: {
         where: { status: "ACTIVE" },
         select: {
           id: true,
+          userId: true,
           segment: true,
           territory: true,
           annualTarget: true,
@@ -247,7 +248,15 @@ export default async function DashboardPage(props: {
     }
   }
   
-  if (!targetAEProfile) {
+  if (!targetAEProfile && isAdmin) {
+    // Admin defaults to their own AE profile if available
+    const myAE = allAEs.find((ae) => ae.userId === userId);
+    if (myAE) {
+      targetAEProfile = myAE;
+    }
+  }
+
+  if (!targetAEProfile && !isAdmin) {
     // Use the logged-in user's AE profile
     const myAE = await prisma.aEProfile.findUnique({
       where: { userId },
@@ -283,23 +292,18 @@ export default async function DashboardPage(props: {
 
   const targetAEProfileId = targetAEProfile?.id ?? null;
 
-  // Always fetch YTD deals for attainment calculation
-  const ytdDealsFromDb = targetAEProfileId
+  // Fetch deals for the selected view range
+  const dealsFromDb = targetAEProfileId
     ? await prisma.deal.findMany({
         where: {
           aeProfileId: targetAEProfileId,
           status: { contains: "won", mode: "insensitive" },
-          closeDate: { gte: ytdStart, lte: now },
+          closeDate: { gte: range.start, lte: range.end },
         },
         orderBy: [{ closeDate: "desc" }],
         take: 500,
       })
     : [];
-
-  // Filter deals for the selected view range
-  const dealsFromDb = ytdDealsFromDb.filter((d) => 
-    d.closeDate >= range.start && d.closeDate <= range.end
-  );
 
   // Transform deals for the table
   const dealsForTable = dealsFromDb.map((d) => ({
@@ -332,7 +336,17 @@ export default async function DashboardPage(props: {
   })) ?? [];
 
   // Calculate YTD total for attainment (always based on full YTD, not view)
-  const ytdTotalAmount = ytdDealsFromDb.reduce((sum, d) => sum + decimalToNumber(d.amount), 0);
+  const ytdTotals = targetAEProfileId
+    ? await prisma.deal.aggregate({
+        where: {
+          aeProfileId: targetAEProfileId,
+          status: { contains: "won", mode: "insensitive" },
+          closeDate: { gte: ytdStart, lte: now },
+        },
+        _sum: { amount: true },
+      })
+    : { _sum: { amount: null } };
+  const ytdTotalAmount = decimalToNumber(ytdTotals._sum.amount);
 
   // Get annual target and calculate attainment
   const aeAnnualTarget = decimalToNumber(targetAEProfile?.annualTarget);

@@ -214,6 +214,34 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
   const startedAt = new Date();
   const [membersRaw, dealsRaw] = await Promise.all([listWorkspaceMembersRaw(), listDealsRaw()]);
 
+  const memberEmails = Array.from(
+    new Set(
+      membersRaw
+        .map((raw) => {
+          const rec = (asRecord(raw) ?? {}) as Record<string, unknown>;
+          return (
+            pickString(
+              rec["email"],
+              rec["email_address"],
+              asRecord(rec["attributes"])?.["email"],
+              asRecord(rec["user"])?.["email"],
+            )?.toLowerCase() ?? null
+          );
+        })
+        .filter(Boolean) as string[]
+    )
+  );
+
+  const existingMembersByEmail = memberEmails.length
+    ? await prisma.attioWorkspaceMember.findMany({
+        where: { email: { in: memberEmails } },
+        select: { id: true, email: true },
+      })
+    : [];
+  const existingMemberIdByEmail = new Map(
+    existingMembersByEmail.map((m) => [m.email!.toLowerCase().trim(), m.id])
+  );
+
   const memberUpserts = await Promise.all(
     membersRaw.map(async (raw) => {
       const rec = (asRecord(raw) ?? {}) as Record<string, unknown>;
@@ -238,19 +266,16 @@ export async function runAttioSync(params: { actorUserId: string | null }): Prom
       // Repair/migrate: if we previously stored a bad primary key (e.g. "[object Object]") for the same email,
       // we need to replace that row so future link-by-email yields a valid id.
       if (email) {
-        const existingByEmail = await prisma.attioWorkspaceMember.findUnique({
-          where: { email },
-          select: { id: true },
-        });
-        if (existingByEmail && existingByEmail.id !== id) {
+        const existingId = existingMemberIdByEmail.get(email);
+        if (existingId && existingId !== id) {
           return prisma.$transaction(async (tx) => {
             await tx.aEProfile.updateMany({
-              where: { attioWorkspaceMemberId: existingByEmail.id },
+              where: { attioWorkspaceMemberId: existingId },
               data: { attioWorkspaceMemberId: id },
             });
 
             // Safe because no FK references AttioWorkspaceMember directly.
-            await tx.attioWorkspaceMember.delete({ where: { id: existingByEmail.id } });
+            await tx.attioWorkspaceMember.delete({ where: { id: existingId } });
 
             await tx.attioWorkspaceMember.create({
               data: { id, email, fullName, status, rawAttioPayload: raw as Prisma.InputJsonValue },

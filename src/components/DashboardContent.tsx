@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type BonusRule = {
   id: string;
@@ -74,7 +74,7 @@ export function DashboardContent({
     setDeals(initialDeals);
   }, [initialDeals]);
 
-  async function toggleBonusRule(dealId: string, ruleId: string, currentlyEnabled: boolean) {
+  const toggleBonusRule = useCallback(async (dealId: string, ruleId: string, currentlyEnabled: boolean) => {
     setUpdating(`${dealId}-${ruleId}`);
     try {
       const res = await fetch(`/api/deals/${dealId}/bonus-rules`, {
@@ -102,44 +102,52 @@ export function DashboardContent({
     } finally {
       setUpdating(null);
     }
-  }
+  }, []);
 
-  function calculateCommission(deal: Deal) {
-    let totalRate = baseRate;
-    const appliedBonuses: string[] = [];
+  const calculateCommission = useCallback(
+    (deal: Deal) => {
+      let totalRate = baseRate;
 
-    for (const rule of bonusRules) {
-      if (deal.appliedBonusRuleIds.includes(rule.id)) {
-        totalRate += rule.rateAdd;
-        appliedBonuses.push(rule.name);
+      for (const rule of bonusRules) {
+        if (deal.appliedBonusRuleIds.includes(rule.id)) {
+          totalRate += rule.rateAdd;
+        }
       }
-    }
 
-    return {
-      totalRate,
-      commission: deal.amount * totalRate,
-      appliedBonuses,
-    };
-  }
+      return {
+        totalRate,
+        commission: deal.amount * totalRate,
+      };
+    },
+    [baseRate, bonusRules]
+  );
 
   // Build query params for view toggle links
-  const buildQuery = (newView: string) => {
+  const buildQuery = useCallback((newView: string) => {
     const query: Record<string, string> = { view: newView };
     if (selectedAEId) query.ae = selectedAEId;
     return query;
-  };
+  }, [selectedAEId]);
 
   // Calculate totals - reactive to deals state changes
-  const totals = deals.reduce(
-    (acc, deal) => {
-      const { commission } = calculateCommission(deal);
-      return {
-        amount: acc.amount + deal.amount,
-        commission: acc.commission + commission,
-      };
-    },
-    { amount: 0, commission: 0 }
-  );
+  const computedDeals = useMemo(() => {
+    return deals.map((deal) => {
+      const { totalRate, commission } = calculateCommission(deal);
+      return { ...deal, totalRate, commission };
+    });
+  }, [deals, calculateCommission]);
+
+  const totals = useMemo(() => {
+    return computedDeals.reduce(
+      (acc, deal) => {
+        return {
+          amount: acc.amount + deal.amount,
+          commission: acc.commission + deal.commission,
+        };
+      },
+      { amount: 0, commission: 0 }
+    );
+  }, [computedDeals]);
 
   // Total commission includes deals commission + annual accelerator
   const totalCommissionWithAccelerator = totals.commission + annualAcceleratorBonus;
@@ -174,9 +182,9 @@ export function DashboardContent({
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
           <div className="text-sm text-zinc-600">Deals Count</div>
-          <div className="mt-2 text-2xl font-semibold">{deals.length}</div>
+          <div className="mt-2 text-2xl font-semibold">{computedDeals.length}</div>
           <div className="mt-1 text-xs text-zinc-500">
-            ACV: {formatCurrency(deals.length > 0 ? totals.amount / deals.length : 0)}
+            ACV: {formatCurrency(computedDeals.length > 0 ? totals.amount / computedDeals.length : 0)}
           </div>
         </div>
       </section>
@@ -232,7 +240,7 @@ export function DashboardContent({
               </tr>
             </thead>
             <tbody>
-              {deals.length === 0 ? (
+              {computedDeals.length === 0 ? (
                 <tr>
                   <td colSpan={6 + bonusRules.length} className="px-5 py-8 text-center text-zinc-500">
                     No closed won deals in this period.
@@ -240,8 +248,7 @@ export function DashboardContent({
                 </tr>
               ) : (
                 <>
-                  {deals.map((deal) => {
-                    const { totalRate, commission } = calculateCommission(deal);
+                  {computedDeals.map((deal) => {
                     return (
                       <tr key={deal.id} className="border-t border-zinc-100">
                         <td className="px-5 py-4">
@@ -301,17 +308,17 @@ export function DashboardContent({
                           )}
                         </td>
                         <td className="w-20 px-5 py-4 text-right">
-                          <div className="font-medium text-zinc-900">{formatPercent(totalRate)}</div>
+                          <div className="font-medium text-zinc-900">{formatPercent(deal.totalRate)}</div>
                         </td>
                         <td className="w-32 px-5 py-4 text-right font-medium text-zinc-950">
-                          {formatCurrency(commission)}
+                          {formatCurrency(deal.commission)}
                         </td>
                       </tr>
                     );
                   })}
                   {/* Totals row */}
                   <tr className="border-t-2 border-zinc-200 bg-zinc-50 font-medium">
-                    <td className="px-5 py-4 text-zinc-700">Total ({deals.length} deals)</td>
+                    <td className="px-5 py-4 text-zinc-700">Total ({computedDeals.length} deals)</td>
                     <td className="px-5 py-4"></td>
                     <td className="px-5 py-4 text-right text-zinc-900">{formatCurrency(totals.amount)}</td>
                     {bonusRules.map((rule) => (

@@ -13,19 +13,22 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user =
-    (userId
-      ? await prisma.user.findUnique({
-          where: { id: userId },
-          select: { id: true, email: true, fullName: true, role: true, status: true, aeProfile: { select: { id: true, attioWorkspaceMemberId: true, status: true } } },
-        })
-      : null) ??
-    (email
-      ? await prisma.user.findUnique({
-          where: { email },
-          select: { id: true, email: true, fullName: true, role: true, status: true, aeProfile: { select: { id: true, attioWorkspaceMemberId: true, status: true } } },
-        })
-      : null);
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(userId ? [{ id: userId }] : []),
+        ...(email ? [{ email }] : []),
+      ],
+    },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      role: true,
+      status: true,
+      aeProfile: { select: { id: true, attioWorkspaceMemberId: true, status: true } },
+    },
+  });
 
   return NextResponse.json({ user });
 }

@@ -92,45 +92,32 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Perform updates in a transaction
-    const [profile] = await prisma.$transaction([
-      prisma.aEProfile.update({
-        where: { id },
-        data: hasProfileUpdate ? profileUpdateData : {},
-        include: {
-          user: {
-            select: { id: true, fullName: true, email: true, profileImageUrl: true, role: true },
-          },
-          commissionPlan: {
-            select: { id: true, name: true },
-          },
+    // Perform updates in a transaction (user update first, then profile)
+    const profileUpdateOp = prisma.aEProfile.update({
+      where: { id },
+      data: hasProfileUpdate ? profileUpdateData : {},
+      include: {
+        user: {
+          select: { id: true, fullName: true, email: true, profileImageUrl: true, role: true },
         },
-      }),
-      ...(hasUserUpdate
+        commissionPlan: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    const results = await prisma.$transaction(
+      hasUserUpdate
         ? [
             prisma.user.update({
               where: { id: existingProfile.userId },
               data: userUpdateData,
             }),
+            profileUpdateOp,
           ]
-        : []),
-    ]);
-
-    // If we updated the user role, we need to fetch the updated profile with new role
-    if (hasUserUpdate) {
-      const updatedProfile = await prisma.aEProfile.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: { id: true, fullName: true, email: true, profileImageUrl: true, role: true },
-          },
-          commissionPlan: {
-            select: { id: true, name: true },
-          },
-        },
-      });
-      return NextResponse.json({ profile: updatedProfile });
-    }
+        : [profileUpdateOp]
+    );
+    const profile = results[results.length - 1];
 
     return NextResponse.json({ profile });
   } catch (error) {

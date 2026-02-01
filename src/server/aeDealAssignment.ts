@@ -20,18 +20,21 @@ export async function reconcileDealsToAEs(params?: { onlyMemberId?: string }): P
     select: { id: true, attioWorkspaceMemberId: true },
   });
 
-  const map = new Map<string, string>();
+  const memberIdsByAE = new Map<string, string[]>();
   for (const m of mappings) {
-    if (m.attioWorkspaceMemberId) map.set(m.attioWorkspaceMemberId, m.id);
+    if (!m.attioWorkspaceMemberId) continue;
+    const list = memberIdsByAE.get(m.id) ?? [];
+    list.push(m.attioWorkspaceMemberId);
+    memberIdsByAE.set(m.id, list);
   }
 
   let dealsUpdated = 0;
 
-  for (const [memberId, aeProfileId] of map.entries()) {
-    // Update all deals where owner matches but aeProfileId is different or null
+  for (const [aeProfileId, memberIds] of memberIdsByAE.entries()) {
+    // Update all deals where owner matches any memberIds but aeProfileId is different or null
     const res = await prisma.deal.updateMany({
       where: {
-        attioOwnerWorkspaceMemberId: memberId,
+        attioOwnerWorkspaceMemberId: { in: memberIds },
         OR: [
           { aeProfileId: null },
           { aeProfileId: { not: aeProfileId } },
@@ -42,6 +45,6 @@ export async function reconcileDealsToAEs(params?: { onlyMemberId?: string }): P
     dealsUpdated += res.count;
   }
 
-  return { memberIdsMapped: map.size, dealsUpdated };
+  return { memberIdsMapped: mappings.length, dealsUpdated };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type CommissionPlanOption = {
   id: string;
@@ -149,36 +149,22 @@ function DebouncedDateInput({
   );
 }
 
-export function UserProfileManager() {
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [commissionPlans, setCommissionPlans] = useState<CommissionPlanOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function UserProfileManager({
+  initialProfiles,
+  initialCommissionPlans,
+}: {
+  initialProfiles: UserProfile[];
+  initialCommissionPlans: CommissionPlanOption[];
+}) {
+  const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
+  const [commissionPlans, setCommissionPlans] = useState<CommissionPlanOption[]>(
+    initialCommissionPlans
+  );
   const [saving, setSaving] = useState<string | null>(null);
-
-  const fetchProfiles = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/ae-profiles");
-      const data = (await res.json()) as { 
-        profiles?: UserProfile[]; 
-        commissionPlans?: CommissionPlanOption[];
-        error?: string 
-      };
-      if (!res.ok) throw new Error(data.error ?? "Failed to load users");
-      setProfiles(data.profiles ?? []);
-      setCommissionPlans(data.commissionPlans ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchProfiles();
-  }, [fetchProfiles]);
+    setProfiles(initialProfiles);
+    setCommissionPlans(initialCommissionPlans);
+  }, [initialProfiles, initialCommissionPlans]);
 
   async function handleUpdate(
     id: string, 
@@ -205,14 +191,6 @@ export function UserProfileManager() {
     } finally {
       setSaving(null);
     }
-  }
-
-  if (loading) {
-    return <div className="text-sm text-zinc-500">Loading users…</div>;
-  }
-
-  if (error) {
-    return <div className="text-sm text-red-500">{error}</div>;
   }
 
   if (profiles.length === 0) {

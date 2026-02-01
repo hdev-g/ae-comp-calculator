@@ -6,8 +6,8 @@ type BonusRule = {
   id?: string;
   name: string;
   rateAdd: number;
-  effectiveStartDate: string | null;
-  effectiveEndDate: string | null;
+  effectiveStartDate: string | Date | null;
+  effectiveEndDate: string | Date | null;
   enabled: boolean;
   attioAttributeId: string | null;
   attioAttributeName: string | null;
@@ -29,14 +29,14 @@ type PerformanceAccelerator = {
 type CommissionPlan = {
   id: string;
   name: string;
-  effectiveStartDate: string;
-  effectiveEndDate: string | null;
+  effectiveStartDate: string | Date;
+  effectiveEndDate: string | Date | null;
   baseCommissionRate: string | number;
   bonusRules: BonusRule[];
   performanceAccelerators: PerformanceAccelerator[];
 };
 
-function formatDate(dateStr: string | null): string {
+function formatDate(dateStr: string | Date | null): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   return d.toISOString().split("T")[0] ?? "";
@@ -47,9 +47,13 @@ function formatPercent(rate: string | number): string {
   return `${(n * 100).toFixed(2)}%`;
 }
 
-export function CommissionPlanManager() {
-  const [plans, setPlans] = useState<CommissionPlan[]>([]);
-  const [loading, setLoading] = useState(true);
+export function CommissionPlanManager({
+  initialPlans,
+}: {
+  initialPlans: CommissionPlan[];
+}) {
+  const [plans, setPlans] = useState<CommissionPlan[]>(initialPlans);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [editingPlan, setEditingPlan] = useState<CommissionPlan | null>(null);
@@ -89,12 +93,18 @@ export function CommissionPlanManager() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchPlans();
-    fetchAttioAttributes();
-  }, [fetchPlans, fetchAttioAttributes]);
+  const ensureAttioAttributes = useCallback(async () => {
+    if (attioAttributes.length === 0 && !attioLoading) {
+      await fetchAttioAttributes();
+    }
+  }, [attioAttributes.length, attioLoading, fetchAttioAttributes]);
 
-  function handleCreate() {
+  useEffect(() => {
+    setPlans(initialPlans);
+  }, [initialPlans]);
+
+  async function handleCreate() {
+    await ensureAttioAttributes();
     setEditingPlan({
       id: "",
       name: "",
@@ -111,7 +121,8 @@ export function CommissionPlanManager() {
     setIsCreating(true);
   }
 
-  function handleEdit(plan: CommissionPlan) {
+  async function handleEdit(plan: CommissionPlan) {
+    await ensureAttioAttributes();
     setEditingPlan({
       ...plan,
       effectiveStartDate: formatDate(plan.effectiveStartDate),
