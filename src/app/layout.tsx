@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AE Compensation Calculator",
-  description: "Quarterly commission statements from Attio deals.",
+  title: "Wordsmith | Comp Calculator",
+  description: "Wordsmith OTE compensation calculator.",
 };
 
 export default function RootLayout({
