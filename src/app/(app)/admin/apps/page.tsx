@@ -16,8 +16,13 @@ function formatRelativeTime(date: Date): string {
 }
 
 export default async function AdminAppsPage() {
-  // Get the most recent sync time from deals or members
-  const [lastDeal, lastMember] = await Promise.all([
+  // Prefer the audit log (captures every sync, even if no data changed).
+  const [lastAudit, lastDeal, lastMember] = await Promise.all([
+    prisma.auditLog.findFirst({
+      where: { action: "ATTIO_SYNC" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
     prisma.deal.findFirst({
       orderBy: { updatedAt: "desc" },
       select: { updatedAt: true },
@@ -28,7 +33,11 @@ export default async function AdminAppsPage() {
     }),
   ]);
 
-  const lastSyncTime = [lastDeal?.updatedAt, lastMember?.updatedAt]
+  const lastSyncTime = [
+    lastAudit?.createdAt,
+    lastDeal?.updatedAt,
+    lastMember?.updatedAt,
+  ]
     .filter((d): d is Date => d instanceof Date)
     .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
 
