@@ -67,6 +67,9 @@ type ParsedDeal = {
  * attribute value is true/checked, the bonus rule is applied to the deal.
  */
 async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | null)[]): Promise<void> {
+  const deals = parsedDeals.filter(Boolean) as ParsedDeal[];
+  if (deals.length === 0) return;
+
   // Get all bonus rules with Attio attribute mappings
   const bonusRulesWithAttio = await prisma.bonusRule.findMany({
     where: {
@@ -76,13 +79,6 @@ async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | nul
     select: {
       id: true,
       attioAttributeId: true,
-      commissionPlan: {
-        select: {
-          aeProfiles: {
-            select: { id: true },
-          },
-        },
-      },
     },
   });
 
@@ -97,37 +93,48 @@ async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | nul
     attrToRules.set(rule.attioAttributeId, existing);
   }
 
-  // Process each deal
-  for (const deal of parsedDeals) {
-    if (!deal) continue;
+  const attioRecordIds = deals.map((d) => d.attioRecordId);
+  const dbDeals = await prisma.deal.findMany({
+    where: { attioRecordId: { in: attioRecordIds } },
+    select: { id: true, attioRecordId: true, aeProfileId: true, appliedBonusRuleIds: true },
+  });
+  const dealByAttioId = new Map(dbDeals.map((d) => [d.attioRecordId, d]));
 
-    const dbDeal = await prisma.deal.findUnique({
-      where: { attioRecordId: deal.attioRecordId },
-      select: { id: true, aeProfileId: true, appliedBonusRuleIds: true },
-    });
-    if (!dbDeal) continue;
-
-    // Get the AE's commission plan's bonus rules
-    let eligibleRuleIds: string[] = [];
-    if (dbDeal.aeProfileId) {
-      const aeProfile = await prisma.aEProfile.findUnique({
-        where: { id: dbDeal.aeProfileId },
-        select: {
-          commissionPlan: {
-            select: {
-              bonusRules: {
-                where: { 
-                  attioAttributeId: { not: null },
-                  enabled: true,
-                },
-                select: { id: true, attioAttributeId: true },
+  const aeProfileIds = Array.from(
+    new Set(dbDeals.map((d) => d.aeProfileId).filter(Boolean) as string[]),
+  );
+  const eligibleRuleIdsByAe = new Map<string, Set<string>>();
+  if (aeProfileIds.length > 0) {
+    const aeProfiles = await prisma.aEProfile.findMany({
+      where: { id: { in: aeProfileIds } },
+      select: {
+        id: true,
+        commissionPlan: {
+          select: {
+            bonusRules: {
+              where: {
+                attioAttributeId: { not: null },
+                enabled: true,
               },
+              select: { id: true },
             },
           },
         },
-      });
-      eligibleRuleIds = aeProfile?.commissionPlan?.bonusRules.map(r => r.id) ?? [];
+      },
+    });
+    for (const aeProfile of aeProfiles) {
+      const ruleIds = aeProfile.commissionPlan?.bonusRules.map((r) => r.id) ?? [];
+      eligibleRuleIdsByAe.set(aeProfile.id, new Set(ruleIds));
     }
+  }
+
+  // Process each deal
+  for (const deal of deals) {
+    const dbDeal = dealByAttioId.get(deal.attioRecordId);
+    if (!dbDeal) continue;
+
+    const eligibleRuleIds =
+      dbDeal.aeProfileId ? eligibleRuleIdsByAe.get(dbDeal.aeProfileId) ?? null : null;
 
     // Check the raw Attio payload for attribute values
     const raw = asRecord(deal.raw);
@@ -145,7 +152,7 @@ async function applyBonusRulesFromAttioAttributes(parsedDeals: (ParsedDeal | nul
       
       for (const ruleId of ruleIds) {
         // Only apply rules that the AE is eligible for
-        if (eligibleRuleIds.length > 0 && !eligibleRuleIds.includes(ruleId)) continue;
+        if (eligibleRuleIds && eligibleRuleIds.size > 0 && !eligibleRuleIds.has(ruleId)) continue;
         
         if (attrValue === true) {
           // Attio attribute is checked - apply the rule
